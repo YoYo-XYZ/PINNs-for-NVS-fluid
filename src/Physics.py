@@ -86,7 +86,7 @@ class Conditions(PointSampling):
     def loss_calc(condition_list, model, loss_fn=None):
         if loss_fn is None:
             loss_fn = nn.MSELoss()
-            
+
         total_loss = 0
         for cond in condition_list:
             total_loss += Conditions._loss_cal_each_condition(cond, model, loss_fn)
@@ -108,7 +108,10 @@ class NVS(PointSampling):
         if t is not None:
             u_t = calc_grad(u, t)
             v_t = calc_grad(v, t)
-        
+        else:
+            u_t = None
+            v_t = None
+
         u_x = calc_grad(u, x)
         v_x = calc_grad(v, x)
         p_x = calc_grad(p, x)
@@ -136,8 +139,7 @@ class NVS(PointSampling):
             # Y-momentum equation
             y_momentum_residual = (v_t + u * v_x + v * v_y -
                                 vu * (v_xx + v_yy) +
-                                p_y / rho)
-                            
+                                p_y / rho)      
         else:
             # X-momentum equation
             x_momentum_residual = (u * u_x + v * u_y -
@@ -151,15 +153,15 @@ class NVS(PointSampling):
 
         return mass_residual, x_momentum_residual, y_momentum_residual
 
-    def loss_cal(self, model, range_x, range_y, num_points, loss_fn, range_t=None):
+    @staticmethod
+    def loss_cal(model, range_x, range_y, num_points, range_t=None):
         """Calculates the mean squared error of the PDE residuals."""
-        x, y, t = self._xyt_point_sampling(range_x, range_y, range_t, num_points, self.is_steady)
-        u_pred, v_pred, p_pred = model(x, y, t)
+
+        x, y, t = NVS._xyt_point_sampling(range_x, range_y, range_t, num_points)
+        pred = model({'x':x, 'y':y, 't':t})
         
-        mass_res, x_mom_res, y_mom_res = self.calc_nvs_residual(x, y, t, u_pred, v_pred, p_pred)
+        mass_res, x_mom_res, y_mom_res = NVS.calc_nvs_residual(x, y, pred['u'], pred['v'], pred['p'], 1, 1)
         
-        pde_loss = (loss_fn(mass_res, torch.zeros_like(mass_res)) +
-                    loss_fn(x_mom_res, torch.zeros_like(x_mom_res)) +
-                    loss_fn(y_mom_res, torch.zeros_like(y_mom_res)))
-                    
+        pde_loss = torch.mean(mass_res**2 + x_mom_res**2 + y_mom_res**2)
+
         return pde_loss
