@@ -23,7 +23,7 @@ class PINN(nn.Module):
         
         # Hidden layers
         for _ in range(length):
-            layers.append(nn.Linear(width, length))
+            layers.append(nn.Linear(width, width))
             layers.append(nn.Tanh())
             
         # Output layer
@@ -31,13 +31,13 @@ class PINN(nn.Module):
         
         self.net = nn.Sequential(*layers)
 
-    def forward(self, x, y, t=None):
+    def forward(self, inputs):
         """Forward pass through the network."""
 
         if self.is_steady:
-            input_tensor = torch.cat([x, y], dim=1)
+            input_tensor = torch.cat([inputs['x'], inputs['y']], dim=1)
         else:
-            input_tensor = torch.cat([x, y, t], dim=1)
+            input_tensor = torch.cat([inputs['x'], inputs['y'], inputs['t']], dim=1)
 
         output = self.net(input_tensor)
 
