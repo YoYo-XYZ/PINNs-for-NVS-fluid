@@ -1,59 +1,114 @@
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
+class Visualization():
+    def __init__(self, model):
+        self.model = model
 
-def visualize_solution(model, time_ratio, config):
-    """
-    Generates and displays contour plots of the solution at a specific time ratio.
-    """
-    n_points = config["vis_n_points"]
-    L, W, T = config["channel_length"], config["channel_width"], config["total_time"]
+    @staticmethod
+    def _create_grid(x_range, y_range, n_points):
+        x_test = torch.linspace(x_range[0], x_range[1], n_points)
+        y_test = torch.linspace(y_range[0], y_range[1], n_points)
+        X, Y = torch.meshgrid(x_test, y_test, indexing='xy')
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
 
-    # Generate test data grid
-    x_test = torch.linspace(0, L, n_points)
-    y_test = torch.linspace(0, W, n_points)
-    X, Y = torch.meshgrid(x_test, y_test, indexing='xy')
-    T_eval = time_ratio * T * torch.ones_like(X)
-    X.requires_grad_(True)
-    Y.requires_grad_(True)
-    T_eval.requires_grad_(True)
+        return X, Y
+    
+    @staticmethod
+    def _pred_from_model(model, X, Y, T, n_points):
+        pred = model({'x':X.reshape(-1, 1), 'y':Y.reshape(-1, 1), 't':T})
+        U = pred["u"].reshape(n_points, n_points)
+        V = pred["v"].reshape(n_points, n_points)
+        P = pred["p"].reshape(n_points, n_points)
 
-    # Predict solution using the model
-    u, v, p = model(X.reshape(-1, 1), Y.reshape(-1, 1), T_eval.reshape(-1, 1))
-    U = u.reshape(n_points, n_points)
-    V = v.reshape(n_points, n_points)
-    P = p.reshape(n_points, n_points)
+        return U, V, P
+    
+    @staticmethod
+    def _torch_to_numpy(in_list):
+        out_list = []
+        for X in in_list:
+            out_list.append(X.detach().numpy())
+        return out_list
 
-    # Calculate residuals for visualization
-    mass_res, x_mom_res, y_mom_res = calc_nvs_residual(X, Y, T_eval, U, V, P, config)
-    total_residual = torch.abs(mass_res + x_mom_res + y_mom_res)
+    @staticmethod
+    def visualize_sol(model, x_range, y_range, n_points, t=None):
+        X,Y = Visualization._create_grid(x_range, y_range, n_points)
 
-    # Prepare data for plotting
-    X_np, Y_np = X.detach().numpy(), Y.detach().numpy()
-    U_np, V_np, P_np = U.detach().numpy(), V.detach().numpy(), P.detach().numpy()
-    total_residual_np = total_residual.detach().numpy()
-    velocity_mag = np.sqrt(U_np**2 + V_np**2)
+        T=None
+        if T is not None:
+            T = t*torch.ones_like(X)
 
-    # Create plots
-    fig, axes = plt.subplots(1, 5, figsize=(30, 5))
-    plots_data = [
-        (U_np, 'U velocity', 'viridis'),
-        (V_np, 'V velocity', 'viridis'),
-        (velocity_mag, 'Velocity Magnitude', 'rainbow'),
-        (P_np, 'Pressure', 'viridis'),
-        (total_residual_np, 'PDE Residual', 'viridis')
-    ]
+        U,V,P = Visualization._pred_from_model(model, X, Y, T, n_points)
 
-    for i, (data, title, cmap) in enumerate(plots_data):
-        im = axes[i].contourf(X_np, Y_np, data, levels=80, cmap=cmap)
-        axes[i].set_title(title)
-        axes[i].set_xlabel('x')
-        axes[i].set_ylabel('y')
-        plt.colorbar(im, ax=axes[i])
-        
-    plt.tight_layout()
-    plt.show()
+        # Prepare data for plotting
+        X_np, Y_np, U_np, V_np, P_np = Visualization._torch_to_numpy([X,Y,U,V,P])
 
-    return U_np, V_np, velocity_mag, P_np, total_residual_np
+        # Create plots
+        plots_data = [
+            (U_np, 'U velocity', 'viridis'),
+            (V_np, 'V velocity', 'viridis'),
+            (np.sqrt(U_np**2 + V_np**2), 'Velocity Magnitude', 'rainbow'),
+            (P_np, 'Pressure', 'viridis'),
+        ]
+        fig, axes = plt.subplots(1, len(plots_data), figsize=(6*len(plots_data)/(y_range[1]-y_range[0])*(x_range[1]-x_range[0]), 5))
+
+        for i, (data, title, cmap) in enumerate(plots_data):
+            im = axes[i].contourf(X_np, Y_np, data, levels=80, cmap=cmap)
+            axes[i].set_title(title)
+            axes[i].set_xlabel('x')
+            axes[i].set_ylabel('y')
+            plt.colorbar(im, ax=axes[i])
+            
+        plt.tight_layout()
+        plt.show()
+
+    def visualize_solution(model, time_ratio, n_points):
+        """
+        Generates and displays contour plots of the solution at a specific time ratio.
+        """
+
+        # Generate test data grid
+        x_test = torch.linspace(0, 10, n_points)
+        y_test = torch.linspace(0, 1, n_points)
+        X, Y = torch.meshgrid(x_test, y_test, indexing='xy')
+        T_eval = time_ratio * 1 * torch.ones_like(X)
+        X.requires_grad_(True)
+        Y.requires_grad_(True)
+        T_eval.requires_grad_(True)
+
+        # Predict solution using the model
+        u, v, p = model(X.reshape(-1, 1), Y.reshape(-1, 1), T_eval.reshape(-1, 1))
+        U = u.reshape(n_points, n_points)
+        V = v.reshape(n_points, n_points)
+        P = p.reshape(n_points, n_points)
+
+
+        # Prepare data for plotting
+        X_np, Y_np = X.detach().numpy(), Y.detach().numpy()
+        U_np, V_np, P_np = U.detach().numpy(), V.detach().numpy(), P.detach().numpy()
+        velocity_mag = np.sqrt(U_np**2 + V_np**2)
+
+        # Create plots
+        fig, axes = plt.subplots(1, 5, figsize=(30, 5))
+        plots_data = [
+            (U_np, 'U velocity', 'viridis'),
+            (V_np, 'V velocity', 'viridis'),
+            (velocity_mag, 'Velocity Magnitude', 'rainbow'),
+            (P_np, 'Pressure', 'viridis'),
+        ]
+
+        for i, (data, title, cmap) in enumerate(plots_data):
+            im = axes[i].contourf(X_np, Y_np, data, levels=80, cmap=cmap)
+            axes[i].set_title(title)
+            axes[i].set_xlabel('x')
+            axes[i].set_ylabel('y')
+            plt.colorbar(im, ax=axes[i])
+            
+        plt.tight_layout()
+        plt.show()
+
+        return U_np, V_np, velocity_mag, P_np, total_residual_np
 
 def create_animated_solution(model, config):
     """

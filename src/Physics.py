@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from Utility import calc_grad
 
+torch.manual_seed(43)
+
 def string_to_grad(input:str):
     """""
     example use
@@ -75,9 +77,10 @@ class Conditions(PointSampling):
     @staticmethod
     def _loss_cal_each_condition(condition, model, loss_fn):
         pred_dict = Conditions._calc_output(model, condition.inputs, condition.target_output)
-        
         loss = 0
         for key in pred_dict:
+            # print(pred_dict[key])
+            # print(condition.target_output[key])
             loss += loss_fn(pred_dict[key], condition.target_output[key])
         loss = loss/len(pred_dict)
         return loss
@@ -98,20 +101,20 @@ class NVS(PointSampling):
         self.is_steady = is_steady
 
     @staticmethod
-    def calc_nvs_residual(x, y, u, v, p, vu, rho, t=None):
+    def calc_nvs_residual(x, y, u, v, p, vu=0.001/1000, rho=1000, t=None):
         """
         Calculates the residuals of the incompressible Navier-Stokes equations.
         The residuals represent how well the network's predictions satisfy the PDEs.
         """
         # First-order derivatives
 
-        if t is not None:
-            u_t = calc_grad(u, t)
-            v_t = calc_grad(v, t)
-        else:
+        if t is None:
             u_t = None
             v_t = None
-
+        else:
+            u_t = calc_grad(u, t)
+            v_t = calc_grad(v, t)
+            
         u_x = calc_grad(u, x)
         v_x = calc_grad(v, x)
         p_x = calc_grad(p, x)
@@ -129,18 +132,8 @@ class NVS(PointSampling):
         # PDE residuals
         # Continuity equation (mass conservation)
         mass_residual = u_x + v_y
-        
-        if t is not None:
-            # X-momentum equation
-            x_momentum_residual = (u_t + u * u_x + v * u_y -
-                                vu * (u_xx + u_yy) +
-                                p_x / rho)
-                                
-            # Y-momentum equation
-            y_momentum_residual = (v_t + u * v_x + v * v_y -
-                                vu * (v_xx + v_yy) +
-                                p_y / rho)      
-        else:
+          
+        if t is None:
             # X-momentum equation
             x_momentum_residual = (u * u_x + v * u_y -
                                 vu * (u_xx + u_yy) +
@@ -151,6 +144,17 @@ class NVS(PointSampling):
                                 vu * (v_xx + v_yy) +
                                 p_y / rho)
 
+        else:
+            # X-momentum equation
+            x_momentum_residual = (u_t + u * u_x + v * u_y -
+                                vu * (u_xx + u_yy) +
+                                p_x / rho)
+                                
+            # Y-momentum equation
+            y_momentum_residual = (v_t + u * v_x + v * v_y -
+                                vu * (v_xx + v_yy) +
+                                p_y / rho)    
+
         return mass_residual, x_momentum_residual, y_momentum_residual
 
     @staticmethod
@@ -160,7 +164,7 @@ class NVS(PointSampling):
         x, y, t = NVS._xyt_point_sampling(range_x, range_y, range_t, num_points)
         pred = model({'x':x, 'y':y, 't':t})
         
-        mass_res, x_mom_res, y_mom_res = NVS.calc_nvs_residual(x, y, pred['u'], pred['v'], pred['p'], 1, 1)
+        mass_res, x_mom_res, y_mom_res = NVS.calc_nvs_residual(x, y, pred['u'], pred['v'], pred['p'])
         
         pde_loss = torch.mean(mass_res**2 + x_mom_res**2 + y_mom_res**2)
 
