@@ -158,6 +158,12 @@ class NVS(PointSampling):
         return mass_residual, x_momentum_residual, y_momentum_residual
 
     @staticmethod
+    def calc_nvs_residual_overall(x, y, u, v, p, vu=0.001/1000, rho=1000, t=None):
+        mass_residual, x_momentum_residual, y_momentum_residual = NVS.calc_nvs_residual(x, y, u, v, p, vu, rho, t)
+        residual = torch.abs(mass_residual) + torch.abs(x_momentum_residual) + torch.abs(y_momentum_residual)
+        return residual
+
+    @staticmethod
     def loss_cal(model, range_x, range_y, num_points, range_t=None):
         """Calculates the mean squared error of the PDE residuals."""
 

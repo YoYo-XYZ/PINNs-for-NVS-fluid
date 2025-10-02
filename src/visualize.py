@@ -1,6 +1,7 @@
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+from Physics import NVS
 class Visualization():
     def __init__(self, model):
         self.model = model
@@ -28,8 +29,21 @@ class Visualization():
     def _torch_to_numpy(in_list):
         out_list = []
         for X in in_list:
-            out_list.append(X.detach().numpy())
+            try:
+                out_list.append(X.detach().numpy())
+            except:
+                out_list.append(X.numpy())
         return out_list
+
+    @staticmethod
+    def plot_data(plot_data, coordinate_data, ax):
+        im = ax.contourf(coordinate_data["x"], coordinate_data["y"], plot_data["data"], levels=80, cmap=plot_data["cmap"])
+        ax.set_title(plot_data["title"])
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        plt.colorbar(im, ax=ax)
+
+        return ax
 
     @staticmethod
     def visualize_sol(model, x_range, y_range, n_points, t=None):
@@ -43,72 +57,27 @@ class Visualization():
 
         # Prepare data for plotting
         X_np, Y_np, U_np, V_np, P_np = Visualization._torch_to_numpy([X,Y,U,V,P])
+        PDE_residual = NVS.calc_nvs_residual_overall(X,Y,U,V,P)
+
 
         # Create plots
         plots_data = [
-            (U_np, 'U velocity', 'viridis'),
-            (V_np, 'V velocity', 'viridis'),
-            (np.sqrt(U_np**2 + V_np**2), 'Velocity Magnitude', 'rainbow'),
-            (P_np, 'Pressure', 'viridis'),
+            {'data': U_np, 'title':'U velocity', 'cmap':'viridis'},
+            {'data': V_np, 'title':'V velocity', 'cmap':'viridis'},
+            {'data': np.sqrt(U_np**2 + V_np**2), 'title':'Velocity Magnitude', 'cmap':'rainbow'},
+            {'data': P_np, 'title':'Pressure', 'cmap':'RdBu'},
+            {'data': PDE_residual.detach().numpy(), 'title':'PDEresidual', 'cmap':'viridis'}
         ]
         fig, axes = plt.subplots(1, len(plots_data), figsize=(6*len(plots_data)/(y_range[1]-y_range[0])*(x_range[1]-x_range[0]), 5))
 
-        for i, (data, title, cmap) in enumerate(plots_data):
-            im = axes[i].contourf(X_np, Y_np, data, levels=80, cmap=cmap)
-            axes[i].set_title(title)
-            axes[i].set_xlabel('x')
-            axes[i].set_ylabel('y')
-            plt.colorbar(im, ax=axes[i])
-            
+        for i, plot_data in enumerate(plots_data):
+            Visualization.plot_data(plot_data, {"x": X_np, "y": Y_np}, axes[i])
+
         plt.tight_layout()
         plt.show()
 
-    def visualize_solution(model, time_ratio, n_points):
-        """
-        Generates and displays contour plots of the solution at a specific time ratio.
-        """
+        return fig
 
-        # Generate test data grid
-        x_test = torch.linspace(0, 10, n_points)
-        y_test = torch.linspace(0, 1, n_points)
-        X, Y = torch.meshgrid(x_test, y_test, indexing='xy')
-        T_eval = time_ratio * 1 * torch.ones_like(X)
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-        T_eval.requires_grad_(True)
-
-        # Predict solution using the model
-        u, v, p = model(X.reshape(-1, 1), Y.reshape(-1, 1), T_eval.reshape(-1, 1))
-        U = u.reshape(n_points, n_points)
-        V = v.reshape(n_points, n_points)
-        P = p.reshape(n_points, n_points)
-
-
-        # Prepare data for plotting
-        X_np, Y_np = X.detach().numpy(), Y.detach().numpy()
-        U_np, V_np, P_np = U.detach().numpy(), V.detach().numpy(), P.detach().numpy()
-        velocity_mag = np.sqrt(U_np**2 + V_np**2)
-
-        # Create plots
-        fig, axes = plt.subplots(1, 5, figsize=(30, 5))
-        plots_data = [
-            (U_np, 'U velocity', 'viridis'),
-            (V_np, 'V velocity', 'viridis'),
-            (velocity_mag, 'Velocity Magnitude', 'rainbow'),
-            (P_np, 'Pressure', 'viridis'),
-        ]
-
-        for i, (data, title, cmap) in enumerate(plots_data):
-            im = axes[i].contourf(X_np, Y_np, data, levels=80, cmap=cmap)
-            axes[i].set_title(title)
-            axes[i].set_xlabel('x')
-            axes[i].set_ylabel('y')
-            plt.colorbar(im, ax=axes[i])
-            
-        plt.tight_layout()
-        plt.show()
-
-        return U_np, V_np, velocity_mag, P_np, total_residual_np
 
 def create_animated_solution(model, config):
     """
@@ -143,6 +112,7 @@ def create_animated_solution(model, config):
         cbars.append(plt.colorbar(im, ax=axes[i]))
         axes[i].set_xlabel('x')
         axes[i].set_ylabel('y')
+
 
     def animate(frame):
         time_ratio = time_ratios[frame]
