@@ -1,76 +1,7 @@
 import torch
 import torch.nn as nn
 from Utility import calc_grad
-
-torch.manual_seed(43)
-
-def string_to_grad(input:str):
-    """""
-    example use
-    input: 'p'_'x'
-    output: ['p','x']
-    """
-    character_list = input.split('_')
-        
-    return character_list
-
-class Bound():
-    def __init__(self, x_range, func_x):
-        self.x_range = x_range
-        self.func_x = func_x
-    
-
-class PointSampling():
-    def __init__(self):
-        pass
-
-#-----------------------------------------------------------------------------------------------sampling points generation
-    @staticmethod
-    def _sampling_range(range_A, num_points):
-        if isinstance(range_A, (list, tuple)):
-            A = torch.empty(num_points, 1).uniform_(range_A[0], range_A[1])
-            A.requires_grad_()
-        else:
-            A = range_A * torch.ones(num_points, 1)
-            A.requires_grad_()
-        return A
-
-    @staticmethod
-    def circle(r,x,y,points):
-        angle = torch.linspace(0,torch.pi,points)
-        X = x + r*torch.cos(angle)
-        Y = y + r*torch.sin(angle)
-        X.requires_grad_()
-        Y.requires_grad_()
-        return X,Y
-
-    @staticmethod
-    def circle_mask(r,x,y, X, Y):
-        outbound_mask1 = (X>torch.sqrt(r**2-y**2))
-        outbound_mask2 = (Y>torch.sqrt(r**2-x**2))
-
-        return outbound_mask1 | outbound_mask2
-    
-    @staticmethod
-    def rectangle_mask(W,L,X,Y):
-        mask = (Y>L )
-    
-
-
-    @staticmethod
-    def _xyt_custom_point_sampling(x, y, t=None):
-        pass
-
-    @staticmethod
-    def _xyt_point_sampling(range_x, range_y, range_t, num_points):
-        x = PointSampling._sampling_range(range_x, num_points)
-        y = PointSampling._sampling_range(range_y, num_points)
-        if range_t is None:
-            t = None
-        else:
-            t = PointSampling._sampling_range(range_t, num_points)
-        return x, y, t
-
+from PointSampling import PointSampling
 class Conditions(PointSampling):
     def __init__(self, inputs:dict, target_output:dict):
         super().__init__()
