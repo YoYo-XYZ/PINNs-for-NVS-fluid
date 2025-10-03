@@ -77,42 +77,27 @@ class Bound():
             
     @staticmethod
     def sampling_area_random(bound_list, n_points, range_x:list, range_y:list):
-        points = torch.empty(n_points, 2).uniform_(
-            torch.tensor(range_x),
-            torch.tensor(range_y)
-        )
+        points = torch.empty(n_points**2, 2)
+        points[:, 0].uniform_(range_x[0] + 1e-6, range_x[1] - 1e-6)  # x values
+        points[:, 1].uniform_(range_y[0] + 1e-6, range_y[1] - 1e-6)  # y values
         X = points[:, 0]  # x-coordinates
         Y = points[:, 1]  # y-coordinates
 
 
         mask_list = []
+        negative_mask_list = []
         for bound in bound_list:
-            mask_list.append(bound.mask_area(X,Y))
+            if bound.is_true_bound:
+                mask_list.append(bound.mask_area(X,Y))
+            else:
+                negative_mask_list.append(bound.mask_area(X,Y))
         
-        mask = torch.logical_and(mask_list)
+        mask = torch.stack(mask_list, dim=0).any(dim=0)
+        if negative_mask_list:
+            negative_mask = torch.stack(negative_mask_list, dim=0).all(dim=0)
+            mask = mask | negative_mask
 
-        return X[mask], Y[mask]
-
-if __name__ == "__madfsdfin__":
-    import matplotlib.pyplot as plt
-
-    def func1(x):
-        return torch.sqrt(4 - x**2)
-
-    def func2(x):
-        return -torch.sqrt(4 - x**2)
-
-    bound1 = Bound([-2,2], func1, True)
-    bound2 = Bound([-2,2], func2, False)
-
-    X, Y = Bound.sampling_area_uniform([bound1, bound2], 300, [-3,3], [-3,3])
-
-    plt.figure()
-    plt.scatter(X,Y,s=1)
-    plt.xlim(-5,5)
-    plt.ylim(-5,5)
-    plt.gca().set_aspect('equal', adjustable='box')
-    plt.show()
+        return X[~mask], Y[~mask]
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
@@ -126,7 +111,6 @@ if __name__ == "__main__":
     def func3(x):
         return 0
     bound3 = Bound([0,2], func3, False)
-
 
     def func4(y):
         return 0
@@ -144,14 +128,8 @@ if __name__ == "__main__":
         return -torch.sqrt(0.2**2-(x-1)**2)+0.75
     bound8 = Bound([0.8,1.2], func8, True,'x',False)
 
-    def func9(x):
-        return torch.sqrt(0.2**2-(x-1.5)**2)+0.75
-    bound9 = Bound([1.3,1.7], func9, False,'x',False)
-    def func10(x):
-        return -torch.sqrt(0.2**2-(x-1.5)**2)+0.75
-    bound10 = Bound([1.3,1.7], func10, True,'x',False)
-
-    X, Y = Bound.sampling_area_uniform([bound1, bound2, bound3, bound4, bound5, bound6, bound7, bound8, bound9, bound10], 100, [0,2], [0,1])
+    X, Y = Bound.sampling_area_random([bound1, bound2, bound3, bound4, bound5, bound6, bound7, bound8], 200, [0,2], [0,1])
+    print(X.shape)
 
     plt.figure()
     plt.scatter(X,Y,s=1)
