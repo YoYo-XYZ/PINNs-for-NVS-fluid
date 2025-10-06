@@ -54,7 +54,7 @@ class Bound():
             X = points[:, 0]  # x-coordinates
             Y = points[:, 1]  # y-coordinates
         else:
-            if (n_points_square, list):
+            if isinstance(n_points_square, list):
                 n_points_square_x = n_points_square[0]
                 n_points_square_y = n_points_square[1]
             else:
@@ -202,11 +202,12 @@ class PhysicsBound():
 
 
 #-----------------------------------------------------------------------------------------------process PDE related value
-    def pde_define(self, pde_class:NVS):
+    def pde_define(self, pde_class):
         self.PDE = pde_class
     def process_model(self, model):
         self.model_inputs = self.inputs_tensor_dict
         self.model_outputs = model(self.inputs_tensor_dict)
+        return self.model_outputs
     def process_pde(self):
         self.PDE.calc_residual(self.model_inputs | self.model_outputs)
     

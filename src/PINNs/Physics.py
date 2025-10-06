@@ -6,6 +6,7 @@ class NVS():
         super().__init__()
         self.vu = vu
         self.rho = rho
+        self.var = {}
 
     def calc_residual(self, inputs_dict):
         x = inputs_dict['x']
@@ -28,19 +29,19 @@ class NVS():
             u_t = calc_grad(u, t)
             v_t = calc_grad(v, t)
             
-        u_x = calc_grad(u, x)
-        v_x = calc_grad(v, x)
-        p_x = calc_grad(p, x)
+        self.var['u_x'] = u_x = calc_grad(u, x)
+        self.var['v_x'] = v_x = calc_grad(v, x)
+        self.var['p_x'] = p_x = calc_grad(p, x)
         
-        u_y = calc_grad(u, y)
-        v_y = calc_grad(v, y)
-        p_y = calc_grad(p, y)
+        self.var['u_y'] = u_y = calc_grad(u, y)
+        self.var['v_y'] = v_y = calc_grad(v, y)
+        self.var['p_y'] = p_y = calc_grad(p, y)
 
         # Second-order derivatives
-        u_xx = calc_grad(u_x, x)
-        v_xx = calc_grad(v_x, x)
-        u_yy = calc_grad(u_y, y)
-        v_yy = calc_grad(v_y, y)
+        self.var['u_xx'] = u_xx = calc_grad(u_x, x)
+        self.var['v_xx'] = v_xx = calc_grad(v_x, x)
+        self.var['u_yy'] = u_yy = calc_grad(u_y, y)
+        self.var['v_yy'] = v_yy = calc_grad(v_y, y)
         
         # PDE residuals
         # Continuity equation (mass conservation)

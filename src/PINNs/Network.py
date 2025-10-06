@@ -71,7 +71,7 @@ class NetworkTrainer():
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(epochs):
             optimizer.zero_grad()
-            loss_dict = calc_loss()
+            loss_dict = calc_loss(model)
             loss_dict['total_loss'].backward()
             optimizer.step()
 
