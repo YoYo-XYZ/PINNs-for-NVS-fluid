@@ -15,14 +15,20 @@ def calc_grad(y, x):
         create_graph=True,)[0]
     return grad
 
-def to_require_grad(tensor_list):
-    """
-    Converts a tensor to require gradients.
+def to_require_grad(*tensors):
+    if len(tensors) == 1:
+        return tensors[0].clone().detach().requires_grad_(True)
+    else:
+        return (t.clone().detach().requires_grad_(True) for t in tensors)
 
-    Args:
-        tensor (torch.Tensor): The input tensor.
+def torch_to_numpy(*tensors):
+    def to_numpy(x):
+        try:
+            return x.detach().numpy()
+        except:
+            return x.numpy()
 
-    Returns:
-        torch.Tensor: The tensor with requires_grad set to True.
-    """
-    return (t.clone().detach().requires_grad_(True) for t in tensor_list)
+    if len(tensors) == 1:
+        return to_numpy(tensors[0])
+    else:
+        return tuple(to_numpy(x) for x in tensors)

@@ -1,6 +1,6 @@
 import torch
-from Utility import *
-torch.manual_seed(43)
+from .Utility import *
+from Physics import NVS
 
 def string_to_grad(input:str):
     """""
@@ -45,17 +45,22 @@ class Bound():
 
         return mask_x & mask_y
 
-    @staticmethod
-    def sampling_area(bound_list, n_points, range_x:list, range_y:list, random=False):
+    @classmethod
+    def sampling_area(cls, bound_list, n_points_square, range_x:list, range_y:list, random=False, return_info=False):
         if random:
-            points = torch.empty(n_points**2, 2)
+            points = torch.empty(n_points_square, 2)
             points[:, 0].uniform_(range_x[0] + 1e-6, range_x[1] - 1e-6)  # x values
             points[:, 1].uniform_(range_y[0] + 1e-6, range_y[1] - 1e-6)  # y values
             X = points[:, 0]  # x-coordinates
             Y = points[:, 1]  # y-coordinates
         else:
-            X_range = torch.linspace(range_x[0]+1e-6, range_x[1]-1e-6, n_points)
-            Y_range = torch.linspace(range_y[0]+1e-6, range_y[1]-1e-6, n_points)
+            if (n_points_square, list):
+                n_points_square_x = n_points_square[0]
+                n_points_square_y = n_points_square[1]
+            else:
+                n_points_square_x = n_points_square_y = n_points_square
+            X_range = torch.linspace(range_x[0]+1e-6, range_x[1]-1e-6, n_points_square_x)
+            Y_range = torch.linspace(range_y[0]+1e-6, range_y[1]-1e-6, n_points_square_y)
             X, Y = torch.meshgrid(X_range, Y_range)
 
         mask_list = []
@@ -71,9 +76,18 @@ class Bound():
             negative_mask = torch.stack(negative_mask_list, dim=0).all(dim=0)
             mask = mask | negative_mask
 
-        return X[~mask], Y[~mask]
+
+        if return_info:
+            area_info = {
+            "sampling_range_x" : range_x,
+            "sampling_range_y" : range_y,
+            "sampling_width"   : range_y[1] - range_y[0],
+            "sampling_length"  : range_x[1] - range_x[0]
+            }
+            return X[~mask], Y[~mask], area_info
+        else:
+            return X[~mask], Y[~mask]
         
-import torch.nn as nn
 class PhysicsBound():
     def __init__(self):
         self.is_sampled = False
@@ -89,53 +103,73 @@ class PhysicsBound():
 #----------------------------------------------------------------------------------------------- usual conditions
     @classmethod
     def define_boundary_condition(cls, bound:Bound, condition_dict: dict, range_t=None):
-        cls.bound = bound
-        cls.condition_dict = condition_dict
-        cls.range_t = range_t
-        cls.condition_type = "Boundary_conditions"
+        obj = cls()
+        obj.bound = bound
+        obj.condition_dict = condition_dict
+        obj.range_t = range_t
+        obj.bound_type = "BC"
 
-        return cls()
+        return obj
     
     @classmethod
     def define_initial_condition(cls, bound_list:list, sampling_range_x:list, sampling_range_y:list, condition_dict:dict, t=0.0):
-        cls.bound_list = bound_list
-        cls.sampling_range_x = sampling_range_x
-        cls.sampling_range_y = sampling_range_y
-        cls.condition_dict = condition_dict
-        cls.t = t
-        cls.condition_type = "Initial_conditions"
+        obj = cls()
+        obj.bound_list = bound_list
+        obj.sampling_range_x = sampling_range_x
+        obj.sampling_range_y = sampling_range_y
+        obj.condition_dict = condition_dict
+        obj.t = t
+        obj.bound_type = "IC"
         
-        return cls()
+        return obj
+    
+    @classmethod
+    def define_pde_area(cls, bound_list:list, sampling_range_x:list, sampling_range_y:list, PDE_class:NVS, range_t=None):
+        obj = cls()
+        obj.bound_list = bound_list
+        obj.range_t = range_t
+        obj.sampling_range_x = sampling_range_x
+        obj.sampling_range_y = sampling_range_y
+        obj.PDE = PDE_class
+        obj.bound_type = "PDE"
 
-    def create_collocation_points(self, n_points, random):
+        return obj
+
+    def sampling_collocation_points(self, n_points, random=False):
         self.is_sampled = True
-        if self.condition_type == "Boundary_conditions":
+        if self.bound_type == "BC":
             x,y = self.bound.sampling_line(n_points, random)
-            self.number_points = x.shape[0]
             
             if self.range_t is not None:
                 t = PhysicsBound.sampling_time(self.range_t, self.number_points, random)
+                t = t[:,None].requires_grad_()
+            else:
+                t = None
 
             x = x[:,None].requires_grad_()
             y = y[:,None].requires_grad_()
-            t = t[:,None].requires_grad_()
 
-        elif self.condition_type == "Initial_conditions":        
-            x, y = Bound.sampling_area(self.bound_list, n_points, self.sampling_range_x, self.sampling_range_y, random)
-            t = t*torch.ones_like(x)
+        else:    
+            x, y, self.area_info = Bound.sampling_area(self.bound_list, n_points, self.sampling_range_x, self.sampling_range_y, random, True)
+            if self.bound_type == 'IC':
+                t = t*torch.ones_like(x)
+                t = t[:,None].requires_grad_()
+            else:
+                t = None
 
             x = x[:,None].requires_grad_()
             y = y[:,None].requires_grad_()
-            t = t[:,None].requires_grad_()
-
-        else:
-            print("Error: Condition error")
+        
+        self.number_points = x.shape[0]
 
         self.inputs_tensor_dict = {'x':x,'y':y,'t':t}
-        target_output_tensor_dict = {}
-        for key in self.condition_dict:
-            target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(x)
-        self.target_output_tensor_dict = target_output_tensor_dict
+        if self.bound_type == "IC" or self.bound_type == "BC":
+            target_output_tensor_dict = {}
+            for key in self.condition_dict:
+                target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(x)
+            self.target_output_tensor_dict = target_output_tensor_dict
+
+        return x, y
 
 #-----------------------------------------------------------------------------------------------process model's output and calculating loss
     def _calc_output(self, model):
@@ -151,20 +185,72 @@ class PhysicsBound():
                 pred_dict[key] = prediction_dict[key]
         return pred_dict
     
-    def _loss_cal_each_condition(self, model, loss_fn):
-        pred_dict = self._calc_output(model)
+    def calc_loss(self, model, loss_fn=None):
 
-        loss = 0
-        for key in pred_dict:
-            loss += loss_fn(pred_dict[key], self.target_output_tensor_dict[key])
-        return loss/len(pred_dict)
-    
-    def _define_pde(self, PDE):
-        self.PDE = PDE
-    
-    def _get_pde_residual(self, model):
-        return self.PDE.get_residual(model(self.inputs_tensor_dict))
-    
+        if self.bound_type == "IC" or self.bound_type == "BC":
+            pred_dict = self._calc_output(model)
+
+            loss = 0
+            for key in pred_dict:
+                loss += loss_fn(pred_dict[key], self.target_output_tensor_dict[key])
+            return loss/len(pred_dict)
+        
+        else:
+            return self._get_pde_loss(model)
+
+#-----------------------------------------------------------------------------------------------process PDE related value
+    def process_model(self, model):
+        self.model_inputs = self.inputs_tensor_dict
+        self.model_outputs = model(self.inputs_tensor_dict)
+    def pde_define(self, pde_class:NVS):
+        self.PDE = pde_class
+    def _get_pde_residual(self):
+        return self.PDE.calc_residual(self.model_inputs | self.model_outputs)
+    def _get_pde_residual_sum(self):
+        return self.PDE.calc_residual_sum()
     def _get_pde_loss(self):
-        residual = self._get_pde_residual()
-        return self.PDE.get_loss(residual)
+        return self.PDE.calc_loss()
+    
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    import torch
+
+    bound_list = []
+    def func1(x):
+        return 1*torch.ones_like(x)
+    bound_list.append(Bound([0,2], func1, True))
+    def func2(x):
+        return 0*torch.ones_like(x)
+    bound_list.append(Bound([0,2], func2, False))
+
+    def func3(y):
+        return 0*torch.ones_like(y)
+    bound_list.append(Bound([0,1], func3, False, ref_axis='y'))
+    def func4(y):
+        return 2*torch.ones_like(y)
+    bound_list.append(Bound([0,1], func4, True, ref_axis='y'))
+
+    X, Y = Bound.sampling_area(bound_list, 200, [0,2], [0,1])
+    plt.figure()
+    plt.scatter(X,Y,s=1)
+    for bound in bound_list:
+        x,y = bound.sampling_line(200)
+        plt.scatter(x,y,s=1, color='red')
+    plt.xlim(-0.1,2.1)
+    plt.ylim(-0.1,2.1)
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.show()
+
+    physics_cond_list = [
+        {'u': 100.0, 'v': 100.0},  # func1: top wall (y=1) -> No-slip
+        {'u': 100.0, 'v': 100.0},  # func2: bottom wall (y=0) -> No-slip
+        {'u': 100.0, 'v': 100.0},  # func3: inlet (x=0) -> Uniform inflow
+        {'p': 101.0}             # func4: outlet (x=2) -> Zero pressure
+    ]
+    print(physics_cond_list[0])
+    bound1 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[0])
+    bound2 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[1])
+    bound3 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[2])
+    bound4 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[3])
+
+    print(bound1.condition_dict)

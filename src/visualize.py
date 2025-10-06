@@ -1,82 +1,83 @@
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-from Physics import NVS
-class Visualization():
-    def __init__(self, model):
-        self.model = model
+from Network import *
+from PointSampling import *
+
+class Visualizer():
+    def __init__(self):
 
     @staticmethod
-    def _create_grid(x_range, y_range, n_points):
-        x_test = torch.linspace(x_range[0], x_range[1], n_points)
-        y_test = torch.linspace(y_range[0], y_range[1], n_points)
-        X, Y = torch.meshgrid(x_test, y_test, indexing='xy')
-        X.requires_grad_(True)
-        Y.requires_grad_(True)
-
-        return X, Y
-    
-    @staticmethod
-    def _pred_from_model(model, X, Y, T, n_points):
-        pred = model({'x':X.reshape(-1, 1), 'y':Y.reshape(-1, 1), 't':T})
-        U = pred["u"].reshape(n_points, n_points)
-        V = pred["v"].reshape(n_points, n_points)
-        P = pred["p"].reshape(n_points, n_points)
-
-        return U, V, P
-    
-    @staticmethod
-    def _torch_to_numpy(in_list):
-        out_list = []
-        for X in in_list:
-            try:
-                out_list.append(X.detach().numpy())
-            except:
-                out_list.append(X.numpy())
-        return out_list
-
-    @staticmethod
-    def plot_data(plot_data, coordinate_data, ax):
-        im = ax.contourf(coordinate_data["x"], coordinate_data["y"], plot_data["data"], levels=80, cmap=plot_data["cmap"])
-        ax.set_title(plot_data["title"])
+    def colorplot(X, Y, Data, ax:plt, title=None, cmap='viridis', s=1):
+        im = ax.scatter(X, Y, s=s ,c=Data, cmap=cmap, marker = 's')
+        ax.set_title(title)
         ax.set_xlabel('x')
         ax.set_ylabel('y')
         plt.colorbar(im, ax=ax)
+        return ax
+
+    @staticmethod
+    def lineplot(X, Data, ax:plt, title=None):
+        ax.plot(X, Data)
+        ax.grid(True)
+        ax.set_title(title)
 
         return ax
 
     @staticmethod
-    def visualize_sol(model, x_range, y_range, n_points, t=None):
-        X,Y = Visualization._create_grid(x_range, y_range, n_points)
+    def histplot(Data, ax:plt, title=None, bins=30):
+        ax.hist(Data, bins)
+        ax.title(title)
 
-        T=None
-        if T is not None:
-            T = t*torch.ones_like(X)
+    @staticmethod
+    def scatter_points(X, Y, ax, s=1):
+        ax.scatter(X, Y, s=s)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        return ax
+    
+class Visualization(Visualizer):
+    def __init__(self, bound:PhysicsBound, pinns_model):
+        super.__init__()
+        self.bound = bound
+        self.model = pinns_model
 
-        U,V,P = Visualization._pred_from_model(model, X, Y, T, n_points)
+    def sampling_plot_points(self, points_x, points_y):
+        self.bound.sampling_collocation_points(points_x, points_y, False)
 
-        # Prepare data for plotting
-        X_np, Y_np, U_np, V_np, P_np = Visualization._torch_to_numpy([X,Y,U,V,P])
-        PDE_residual = NVS.calc_nvs_residual_overall(X,Y,U,V,P)
+    def colorplot_inputs_outputs(self):
+        self.bound.process_model(self.model)
+        X, Y, t = self.bound.model_inputs
+        X_np = X.detach().numpy().flatten()
+        Y_np = Y.detach().numpy().flatten()
 
-
-        # Create plots
-        plots_data = [
-            {'data': U_np, 'title':'U velocity', 'cmap':'viridis'},
-            {'data': V_np, 'title':'V velocity', 'cmap':'viridis'},
-            {'data': np.sqrt(U_np**2 + V_np**2), 'title':'Velocity Magnitude', 'cmap':'rainbow'},
-            {'data': P_np, 'title':'Pressure', 'cmap':'RdBu'},
-            {'data': PDE_residual.detach().numpy(), 'title':'PDEresidual', 'cmap':'viridis'}
-        ]
-        fig, axes = plt.subplots(1, len(plots_data), figsize=(6*len(plots_data)/(y_range[1]-y_range[0])*(x_range[1]-x_range[0]), 5))
-
-        for i, plot_data in enumerate(plots_data):
-            Visualization.plot_data(plot_data, {"x": X_np, "y": Y_np}, axes[i])
-
+        fig, axes = plt.subplots(1,1+len(self.bound.model_outputs), figsize=(6*5,6))
+        for key, data in enumerate(self.bound.model_outputs):
+            self.colorplot(X_np,Y_np, data.detach().numpy().flatten(),axes[key],key,'viridis',s=50)
         plt.tight_layout()
         plt.show()
 
-        return fig
+
+    @staticmethod
+    def plot_bound(bound_list):
+        X, Y = Bound.sampling_area(bound_list)
+        Visualization.scatter_points(X, Y)
+
+    def define_area(self, area_bound:PhysicsBound, sampling_points_x, sampling_points_y):
+        self.area_bound = area_bound
+        self.X, self.Y = self.area_bound.sampling_collocation_points([sampling_points_x,sampling_points_y], random=False)
+
+    def define_line()
+
+    def define_pde(self, pde_class):
+        pde_class
+
+
+
+
+
+
+
 
 
 def create_animated_solution(model, config):
