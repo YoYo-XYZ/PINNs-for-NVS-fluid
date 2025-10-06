@@ -2,6 +2,8 @@
 
 This repository contains a Python package for solving 2D steady and unsteady Navier-Stokes equations using **Physics-Informed Neural Networks (PINNs)**. The framework is built with PyTorch and is designed to handle fluid flow problems in domains with user-defined geometries.
 
+![Steady-State Channel Flow Simulation Result](channel_flow_steady.png)
+
 ---
 
 ## Key Features
