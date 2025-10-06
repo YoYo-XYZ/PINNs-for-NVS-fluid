@@ -1,15 +1,10 @@
 import torch
 import torch.nn as nn
-import numpy as np
-
-torch.manual_seed(43)
-np.random.seed(43)
-
 class PINN(nn.Module):
     """
     Physics-Informed Neural Network model.
 
-    A feedforward neural network that takes (x, y, t)
+    A feedforward neural network that takes {'x':, "y", t)
     and outputs the fluid velocity components u, v and pressure p.
     """
     def __init__(self, width, length, is_steady):
@@ -41,13 +36,13 @@ class PINN(nn.Module):
         else:
             self.loss_history_dict = {'total_loss':[], 'bc_loss':[], 'ic_loss':[], 'pde_loss':[]}
 
-    def forward(self, inputs):
+    def forward(self, inputs_dict):
         """Forward pass through the network."""
 
         if self.is_steady:
-            input_tensor = torch.cat([inputs['x'], inputs['y']], dim=1)
+            input_tensor = torch.cat([inputs_dict['x'], inputs_dict['y']], dim=1)
         else:
-            input_tensor = torch.cat([inputs['x'], inputs['y'], inputs['t']], dim=1)
+            input_tensor = torch.cat([inputs_dict['x'], inputs_dict['y'], inputs_dict['t']], dim=1)
 
         output = self.net(input_tensor)
 
@@ -60,9 +55,7 @@ class PINN(nn.Module):
     def show_updates(self):
         print(f"epoch {len(self.loss_history_dict['total_loss'])}, " + ", ".join(f"{key}: {value[-1]:.5f}" for key, value in self.loss_history_dict.items()))
 
-
 #-----------------------------------------------------------------------
-
 class NetworkTrainer():
     def __init__(self):
         self.optimizer_choice = {"Adam":None, "LBFGS":None}
@@ -78,7 +71,7 @@ class NetworkTrainer():
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(epochs):
             optimizer.zero_grad()
-            loss_dict = calc_loss()
+            loss_dict = calc_loss(model)
             loss_dict['total_loss'].backward()
             optimizer.step()
 
@@ -90,7 +83,7 @@ class NetworkTrainer():
 
     @staticmethod
     def train_lbfgs(model, epochs, calc_loss, print_every=10):
-        optimizer = torch.optim.LBFGS(model.parameters(), history_size=20, max_iter=100, line_search_fn="strong_wolfe")
+        optimizer = torch.optim.LBFGS(model.parameters(), history_size=50, max_iter=20, line_search_fn="strong_wolfe")
         for epoch in range(epochs):
             def closure():
                 optimizer.zero_grad()
@@ -99,7 +92,7 @@ class NetworkTrainer():
                 closure.loss_dict = loss_dict
                 return loss_dict['total_loss']
             optimizer.step(closure)
-            loss_dict = closure.lost_dict
+            loss_dict = closure.loss_dict
             model.loss_history_dict = NetworkTrainer.record_loss(model.loss_history_dict, loss_dict)
             if epoch % print_every == 0:
                 model.show_updates()

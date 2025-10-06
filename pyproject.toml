@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PINNs"
+version = "0.1.0"
+description = "Physics-Informed Neural Networks"
+authors = [{ name = "Your Name" }]
+readme = "readme.md"
+requires-python = ">=3.8"
+
+[tool.setuptools.packages.find]
+where = ["src"]
