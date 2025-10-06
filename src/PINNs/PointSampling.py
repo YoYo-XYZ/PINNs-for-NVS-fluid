@@ -1,6 +1,6 @@
 import torch
 from .Utility import *
-from Physics import NVS
+from .Physics import NVS
 
 def string_to_grad(input:str):
     """""
@@ -196,20 +196,19 @@ class PhysicsBound():
             return loss/len(pred_dict)
         
         else:
-            return self._get_pde_loss(model)
+            self.process_model(model)
+            self.process_pde()
+            return self.PDE.calc_loss()
+
 
 #-----------------------------------------------------------------------------------------------process PDE related value
+    def pde_define(self, pde_class:NVS):
+        self.PDE = pde_class
     def process_model(self, model):
         self.model_inputs = self.inputs_tensor_dict
         self.model_outputs = model(self.inputs_tensor_dict)
-    def pde_define(self, pde_class:NVS):
-        self.PDE = pde_class
-    def _get_pde_residual(self):
-        return self.PDE.calc_residual(self.model_inputs | self.model_outputs)
-    def _get_pde_residual_sum(self):
-        return self.PDE.calc_residual_sum()
-    def _get_pde_loss(self):
-        return self.PDE.calc_loss()
+    def process_pde(self):
+        self.PDE.calc_residual(self.model_inputs | self.model_outputs)
     
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
