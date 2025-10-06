@@ -26,9 +26,9 @@ class Visualizer():
         return ax
 
     @staticmethod
-    def histplot(Data, ax:plt, title=None, bins=30):
-        ax.hist(Data, bins)
-        ax.title(title)
+    def histplot(Data, ax:plt, title=None, bins='fd'):
+        ax.hist(Data, bins, density=True, alpha=0.7, color="steelblue", edgecolor="black")
+        ax.set_title(title)
 
     @staticmethod
     def scatter_points(X, Y, ax, s=1):
@@ -55,20 +55,22 @@ class Visualization(Visualizer):
 
     def process_model(self):
         data_dict = {}
+
         # main outputs
         data_dict = data_dict | self.bound.process_model(self.model)
         self.bound.process_pde()
+        data_dict = data_dict | self.bound.PDE.var
         data_dict["residual"] = self.bound.PDE.calc_residual_sum() # residual
 
         data_dict["velocity_magnitude"] = torch.sqrt(data_dict["u"]**2 + data_dict["v"]**2)
-
-        data_dict = data_dict | self.bound.PDE.var
-
         self.data_dict = data_dict
 
-    def colorplot_all(self):
+        return list(self.data_dict.keys()), list(self.model.loss_history_dict.keys())
+
+    def plotcolor_all(self):
         subplots_num = len(self.data_dict)
         fig, axes = plt.subplots(1,subplots_num, figsize=(6*subplots_num*self.ratio,6))
+
         for i, (key,data) in enumerate(self.data_dict.items()):
             self.colorplot(self.X_np,self.Y_np, data.detach().numpy().flatten(),axes[i],key,'viridis',s=100)
         plt.tight_layout()
@@ -76,30 +78,46 @@ class Visualization(Visualizer):
 
         return fig
     
-    def colorplot_select(*key):
-        pass
+    def plotcolor_select(self, key_cmap_dict):
+        key_cmap_dict = Visualization._keycmap_dict_process(key_cmap_dict)
+        num_plots = len(key_cmap_dict)
+        fig, axes = plt.subplots(1,num_plots, figsize=(6*num_plots*self.ratio,6))
 
-    def colorplot_model_full(self):
-        self.bound.process_model(self.model)
-        X, Y, t = self.bound.model_inputs.values
-        X_np = X.detach().numpy().flatten()
-        Y_np = Y.detach().numpy().flatten()
-
-        plot_data_dict = self.bound.model_outputs
-        plot_data_dict["velocity_magnitude"] = torch.sqrt(plot_data_dict['u']**2 + plot_data_dict['v']**2)
-        plot_data_dict["pde_residual"] = self.bound._get_pde_residual_sum()
-
-        fig, axes = plt.subplots(1,1+len(plot_data_dict), figsize=(6*5,6))
-        for key, data in enumerate(plot_data_dict):
-            self.colorplot(X_np,Y_np, data.detach().numpy().flatten(),axes[key],key,'viridis',s=50)
+        for i, (key,data) in enumerate(key_cmap_dict.items()):
+            self.colorplot(self.X_np,self.Y_np, self.data_dict[key].detach().numpy().flatten(),axes[i],key,data,s=100)
         plt.tight_layout()
         plt.show()
+        return fig
 
-    def residual_distribution(self):
-        residuals = self.bound._get_pde_residual_sum()
+    def plot_residual_distribution(self):
+        fig, ax = plt.subplots()
         ax = plt.subplot()
-        self.histplot(residuals.detach().numpy(), ax, "residual", bins = 100)
+        self.histplot(self.data_dict["residual"].detach().numpy().flatten(), ax, "residual", bins = 100)
         plt.show()
 
-    def loss_evolution():
-        pass
+        return fig
+
+    def plot_loss_evolution(self, log_scale=False, linewidth = 0.1):
+        fig, ax = plt.subplots()
+        for key in self.model.loss_history_dict: 
+            ax.plot(self.model.loss_history_dict[key], label = key, linewidth = linewidth)
+            if log_scale:
+                ax.set_yscale("log")
+        ax.set_xlabel("Iteration")
+        ax.set_ylabel("Loss")
+        ax.set_title("Training Loss per Iteration")
+        ax.legend()  
+        plt.show()
+
+        return fig
+
+    @staticmethod
+    def _keycmap_dict_process(plot_dict):
+        key_and_cmap_dict = {}
+        for key in plot_dict:
+            if plot_dict[key] is None:
+                cmap = 'viridis'
+            else:
+                cmap = plot_dict[key]
+            key_and_cmap_dict[key] = cmap
+        return key_and_cmap_dict
