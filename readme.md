@@ -70,8 +70,8 @@ model = PINN(width=64, length=4, is_steady=True)
 sampling_resolution_list = [200, 200, 40, 40]
 def random_sampling():
     for i, bc in enumerate(boundary_conditions_list):
-        bc.sampling_collocation_points(sampling_resolution_list[i], is_random=True)
-    area_physics_bound.sampling_collocation_points(100, is_random=True)
+        bc.sampling_collocation_points(sampling_resolution_list[i], random=True)
+    area_physics_bound.sampling_collocation_points(100, random=True)
 
 # Define the loss calculation function
 loss_fn = torch.nn.MSELoss()
