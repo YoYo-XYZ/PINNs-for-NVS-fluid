@@ -92,7 +92,7 @@ class Visualization(Visualizer):
     def plot_residual_distribution(self):
         fig, ax = plt.subplots()
         ax = plt.subplot()
-        self.histplot(self.data_dict["residual"].detach().numpy().flatten(), ax, "residual", bins = 100)
+        self.histplot(self.data_dict["residual"].detach().numpy().flatten(), ax, "abs PDE residual", bins = 100)
         plt.show()
 
         return fig
