@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from .Network import *
-from .PointSampling import *
+from .Geometry import *
 from .Network import *
 
 class Visualizer():
@@ -52,6 +52,7 @@ class Visualization(Visualizer):
         self.width = self.bound.area_info["sampling_width"]
         self.length = self.bound.area_info["sampling_length"]
         self.ratio = self.length/self.width
+        print(self.ratio)
 
     def process_model(self):
         data_dict = {}
