@@ -1,4 +1,4 @@
-# NVS-PINNs: A Framework for Navier-Stokes Equations
+# PINNforFluidDynamics: A Physics-Informed Neural Network Framework for Navier–Stokes Equations
 
 This repository contains a Python package for solving 2D steady and unsteady Navier-Stokes equations using **Physics-Informed Neural Networks (PINNs)**. The framework is built with PyTorch and is designed to handle fluid flow problems in domains with user-defined geometries.
 
