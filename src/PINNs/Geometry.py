@@ -13,21 +13,31 @@ def string_to_grad(input:str):
     return character_list
 
 class Bound():
-    def __init__(self, range_x, func_x, is_inside, ref_axis='x', is_true_bound=True):
+    def __init__(self, range_x, func_x, is_inside, ref_axis='x', is_true_bound=True, func_n_x=None, func_n_y=None, range_n=None):
         self.range_x = range_x
         self.func_x = func_x
         self.is_inside = is_inside
         self.ref_axis = ref_axis
         self.is_true_bound = is_true_bound
     
+        self.func_n_x = func_n_x #for circle
+        self.func_n_y = func_n_y
+        self.range_n = range_n
     def sampling_line(self, n_points, random=False):
-        if random:
-            X = torch.empty(n_points).uniform_(self.range_x[0], self.range_x[1])
+        if self.func_n_x is None:
+            if random:
+                X = torch.empty(n_points).uniform_(self.range_x[0], self.range_x[1])
+            else:
+                X = torch.linspace(self.range_x[0], self.range_x[1], n_points)
             Y = self.func_x(X)
         else:
-            X = torch.linspace(self.range_x[0], self.range_x[1], n_points)
-            Y = self.func_x(X)
-        
+            if random:
+                N = torch.empty(n_points).uniform_(self.range_n[0], self.range_n[1])
+            else:
+                N = torch.linspace(self.range_n[0], self.range_n[1], n_points)
+            X = self.func_n_x(N)
+            Y = self.func_n_y(N)
+
         if self.ref_axis == 'x':
             return X, Y
         else:
@@ -45,8 +55,8 @@ class Bound():
 
         return mask_x & mask_y
 
-    @classmethod
-    def sampling_area(cls, bound_list, n_points_square, range_x:list, range_y:list, random=False, return_info=False):
+    @staticmethod
+    def sampling_area(bound_list, n_points_square, range_x:list, range_y:list, random=False, return_info=False):
         if random:
             points = torch.empty(n_points_square, 2)
             points[:, 0].uniform_(range_x[0] + 1e-6, range_x[1] - 1e-6)  # x values
@@ -62,6 +72,8 @@ class Bound():
             X_range = torch.linspace(range_x[0]+1e-6, range_x[1]-1e-6, n_points_square_x)
             Y_range = torch.linspace(range_y[0]+1e-6, range_y[1]-1e-6, n_points_square_y)
             X, Y = torch.meshgrid(X_range, Y_range)
+            X = X.flatten()
+            Y = Y.flatten()
 
         mask_list = []
         negative_mask_list = []
@@ -88,6 +100,49 @@ class Bound():
         else:
             return X[~mask], Y[~mask]
         
+    @staticmethod
+    def create_rectangle_bound(x_range:list , y_range:list, is_true_bound=True):
+        if is_true_bound:
+            i = lambda x : x
+        else:
+            i = lambda x : not x
+
+        bound_list = [
+            Bound(x_range, lambda x: y_range[0] * torch.ones_like(x), i(False), ref_axis='x', is_true_bound=is_true_bound), # Bottom wall
+            Bound(x_range, lambda x: y_range[1] * torch.ones_like(x), i(True), ref_axis='x', is_true_bound=is_true_bound),  # Top wall
+            Bound(y_range, lambda y: x_range[0] * torch.ones_like(y), i(False), ref_axis='y', is_true_bound=is_true_bound), # Inlet
+            Bound(y_range, lambda y: x_range[1] * torch.ones_like(y), i(True), ref_axis='y', is_true_bound=is_true_bound) # Outlet
+        ]
+
+        return bound_list
+
+    @staticmethod
+    def create_circle_bound(x, y, r, is_true_bound = True):
+        def func_up(X_tensor):
+            return torch.sqrt(r**2 - (X_tensor-x)**2) + y
+        def func_down(X_tensor):
+            return -torch.sqrt(r**2 - (X_tensor-x)**2) + y
+        
+        def func_n_x_up(n):
+            return x + r*torch.cos(n)
+        def func_n_y_up(n):
+            return y + r*torch.sin(n)
+        def func_n_x_down(n):
+            return x + r*torch.cos(n+torch.pi)
+        def func_n_y_down(n):
+            return y + r*torch.sin(n+torch.pi)
+
+        if is_true_bound:
+            i = lambda x : x
+        else:
+            i = lambda x : not x
+        
+        bound_list = [
+        Bound([x-r,x+r], func_up, i(True), ref_axis='x', is_true_bound=is_true_bound, func_n_x=func_n_x_up, func_n_y=func_n_y_up, range_n = [0,torch.pi]),
+        Bound([x-r,x+r], func_down, i(False), ref_axis='x', is_true_bound=is_true_bound, func_n_x=func_n_x_down, func_n_y=func_n_y_down, range_n = [0,torch.pi])
+        ]
+        return bound_list
+
 class PhysicsBound():
     def __init__(self):
         self.is_sampled = False
@@ -166,7 +221,13 @@ class PhysicsBound():
         if self.bound_type == "IC" or self.bound_type == "BC":
             target_output_tensor_dict = {}
             for key in self.condition_dict:
-                target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(x)
+                if isinstance(self.condition_dict[key],(float,int)):
+                    target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(x)
+                else:
+                    variable_key = self.condition_dict[key][0]
+                    func = self.condition_dict[key][1]
+                    target_output_tensor_dict[key] = func(self.inputs_tensor_dict[variable_key].detach().clone())
+                    #print(target_output_tensor_dict[key])
             self.target_output_tensor_dict = target_output_tensor_dict
 
         return x, y
