@@ -7,31 +7,28 @@ class PINN(nn.Module):
     A feedforward neural network that takes {'x':, "y", t)
     and outputs the fluid velocity components u, v and pressure p.
     """
-    def __init__(self, width, length, is_steady):
-
+    def __init__(self, width, length, inputs = ['x','y'], outputs = ['u','v','p']):
         super().__init__()
-        self.is_steady = is_steady
-        if self.is_steady == True:
-            input_param = 2
-        else:
-            input_param = 3
+
+        self.input_key = inputs
+        self.output_key = outputs
+        self.input_param = len(inputs)
+        self.output_param = len(outputs)
+        self.is_steady = not 't' in inputs
 
         layers = []
         # Input layer
-        layers.append(nn.Linear(input_param, width))
+        layers.append(nn.Linear(self.input_param, width))
         layers.append(nn.Tanh())
-        
         # Hidden layers
         for _ in range(length):
             layers.append(nn.Linear(width, width))
             layers.append(nn.Tanh())
-            
         # Output layer
-        layers.append(nn.Linear(width, 3))
-        
+        layers.append(nn.Linear(width, self.output_param))
         self.net = nn.Sequential(*layers)
 
-        if is_steady:
+        if self.is_steady:
             self.loss_history_dict = {'total_loss':[], 'bc_loss':[], 'pde_loss':[]}
         else:
             self.loss_history_dict = {'total_loss':[], 'bc_loss':[], 'ic_loss':[], 'pde_loss':[]}
@@ -40,17 +37,15 @@ class PINN(nn.Module):
         """Forward pass through the network."""
 
         if self.is_steady:
-            input_tensor = torch.cat([inputs_dict['x'], inputs_dict['y']], dim=1)
+            input_tensor = torch.cat([inputs_dict[key] for key in self.input_key], dim=1)
         else:
-            input_tensor = torch.cat([inputs_dict['x'], inputs_dict['y'], inputs_dict['t']], dim=1)
+            input_tensor = torch.cat([inputs_dict[key] for key in self.output_key], dim=1)
 
-        output = self.net(input_tensor)
-
-        u = output[:, 0:1]
-        v = output[:, 1:2]
-        p = output[:, 2:3]
-        
-        return {'u':u, 'v':v, 'p':p}
+        pred = self.net(input_tensor)
+        output_dict = {}
+        for i, key in enumerate(self.output_key):
+            output_dict[key] = pred[:, i:i+1]
+        return output_dict
     
     def show_updates(self):
         print(f"epoch {len(self.loss_history_dict['total_loss'])}, " + ", ".join(f"{key}: {value[-1]:.5f}" for key, value in self.loss_history_dict.items()))

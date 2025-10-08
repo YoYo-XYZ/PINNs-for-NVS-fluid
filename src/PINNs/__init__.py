@@ -1,5 +1,5 @@
 from .Physics import *
 from .Network import *
-from .PointSampling import *
+from .Geometry import *
 from .Utility import *
 from .Visualize import *

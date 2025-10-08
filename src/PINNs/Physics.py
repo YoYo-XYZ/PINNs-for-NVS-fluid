@@ -1,7 +1,26 @@
 import torch
 from .Utility import calc_grad
 
-class NVS():
+class PDE():
+    def __init__(self):
+        pass
+
+    def calc_residual_sum(self):
+        residuals_abs_sum = 0
+        for residual in self.residuals:
+            residuals_abs_sum += torch.abs(residual)
+        return residuals_abs_sum
+
+    def calc_loss(self):
+        loss = 0
+        for residual in self.residuals:
+            loss += residual**2
+
+        loss = torch.mean(loss)
+        return loss
+
+
+class NVS(PDE):
     def __init__(self, vu=0.001/1000, rho=1000.0):
         super().__init__()
         self.vu = vu
@@ -73,16 +92,27 @@ class NVS():
 
         return self.residuals
 
-    def calc_residual_sum(self):
-        residuals_abs_sum = 0
-        for residual in self.residuals:
-            residuals_abs_sum += torch.abs(residual)
-        return residuals_abs_sum
+class Heat(PDE):
+    def __init__(self, alpha=0.01):
+        super().__init__()
+        self.alpha = alpha
+        self.var = {}
 
-    def calc_loss(self):
-        loss = 0
-        for residual in self.residuals:
-            loss += residual**2
+    def calc_residual(self, inputs_dict):
+        x = inputs_dict['x']
+        y = inputs_dict['y']
+        t = inputs_dict['t']
+        u = inputs_dict['u']
 
-        loss = torch.mean(loss)
-        return loss
+        # Derivatives
+        u_t = calc_grad(u, t)
+        u_x = calc_grad(u, x)
+        u_y = calc_grad(u, y)
+        u_xx = calc_grad(u_x, x)
+        u_yy = calc_grad(u_y, y)
+
+        # Heat equation residual
+        heat_residual = u_t - self.alpha * (u_xx + u_yy)
+
+        self.residuals = (heat_residual,)
+        return self.residuals
