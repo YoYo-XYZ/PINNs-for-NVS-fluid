@@ -1,6 +1,6 @@
 # PINNforFluidDynamics: A Physics-Informed Neural Network Framework for Navier–Stokes Equations
 
-This repository contains a Python package for solving 2D steady and unsteady Navier-Stokes equations using **Physics-Informed Neural Networks (PINNs)**. The framework is built with PyTorch and is designed to handle fluid flow problems in domains with user-defined geometries.
+This repository contains a Python package for solving 2D steady and unsteady Navier-Stokes equations using **Physics-Informed Neural Networks (PINNs)**. The framework is built with **PyTorch** and is designed to handle fluid flow problems in domains with *user-defined geometries*.
 
 ![Steady-State Channel Flow Simulation Result](examples/channel_flow_steady/channel_flow_steady.png)
 
@@ -8,9 +8,8 @@ This repository contains a Python package for solving 2D steady and unsteady Nav
 
 ## Key Features
 
-* **Solves Navier-Stokes Equations**: Models 2D incompressible fluid flow.
-* **Flexible Domain Definition**: Easily define complex physical boundaries for your simulation.
-* **Physics-Informed Approach**: The neural network is constrained by the governing PDEs and boundary conditions, ensuring physically consistent solutions.
+* **Multiple PDEs**: *steady* and *transient* *incompressible* Navier-Stokes equations, Fourier Heat equations
+* **Flexible Domain Definition**: Easily define complex 2D physical boundaries for the simulation.
 * **Built-in Visualization**: Comes with tools to plot results, loss evolution, and residual distributions.
 * **Powered by PyTorch**: Leverages automatic differentiation for calculating gradients required by the PDEs.
 
@@ -137,6 +136,7 @@ The training progress, including the convergence of boundary condition (BC) loss
 You can also analyze the distribution of the PDE residuals to assess how well the network is satisfying the governing equations across the domain.
 
 ---
+
 ## Installation
 To use this package, you'll need Python 3 and the following libraries:
 
@@ -149,6 +149,7 @@ To use this package, you'll need Python 3 and the following libraries:
 Clone the repository and ensure the PINNs directory is in your Python path.
 
 ---
+
 ## Project Structure
 The framework is organized into several modules:
 
@@ -156,7 +157,7 @@ Network.py: Defines the PINN neural network architecture and the NetworkTrainer.
 
 Physics.py: Contains the NVS class, which computes the residuals of the Navier-Stokes equations.
 
-PointSampling.py: Includes the Bound and PhysicsBound classes for defining geometry and sampling points.
+Geometry.py: Includes the Bound and PhysicsBound classes for defining geometry and sampling points.
 
 Visualize.py: Provides the Visualization class for plotting results.
 
