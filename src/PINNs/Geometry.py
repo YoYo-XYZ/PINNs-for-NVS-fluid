@@ -221,7 +221,13 @@ class PhysicsBound():
         if self.bound_type == "IC" or self.bound_type == "BC":
             target_output_tensor_dict = {}
             for key in self.condition_dict:
-                target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(x)
+                if isinstance(self.condition_dict[key],(float,int)):
+                    target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(x)
+                else:
+                    variable_key = self.condition_dict[key][0]
+                    func = self.condition_dict[key][1]
+                    target_output_tensor_dict[key] = func(self.inputs_tensor_dict[variable_key].detach().clone())
+                    #print(target_output_tensor_dict[key])
             self.target_output_tensor_dict = target_output_tensor_dict
 
         return x, y
