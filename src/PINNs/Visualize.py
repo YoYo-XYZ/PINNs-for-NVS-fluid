@@ -79,13 +79,13 @@ class Visualization(Visualizer):
 
         return fig
     
-    def plotcolor_select(self, key_cmap_dict):
+    def plotcolor_select(self, key_cmap_dict, s=100):
         key_cmap_dict = Visualization._keycmap_dict_process(key_cmap_dict)
         num_plots = len(key_cmap_dict)
         fig, axes = plt.subplots(1,num_plots, figsize=(6*num_plots*self.ratio,6))
 
         for i, (key,data) in enumerate(key_cmap_dict.items()):
-            self.colorplot(self.X_np,self.Y_np, self.data_dict[key].detach().numpy().flatten(),axes[i],key,data,s=100)
+            self.colorplot(self.X_np,self.Y_np, self.data_dict[key].detach().numpy().flatten(),axes[i],key,data,s=s)
         plt.tight_layout()
         plt.show()
         return fig
