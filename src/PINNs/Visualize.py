@@ -38,7 +38,7 @@ class Visualizer():
         return ax
     
 class Visualization(Visualizer):
-    def __init__(self, bound:PhysicsBound, pinns_model:PINN):
+    def __init__(self, bound:PhysicsGeometry, pinns_model:PINN):
         super().__init__()
         self.bound = bound
         self.model = pinns_model
