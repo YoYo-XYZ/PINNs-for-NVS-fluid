@@ -1,6 +1,7 @@
 import torch
 from .Utility import *
 from .Physics import NVS
+import copy
 
 def string_to_grad(input:str):
     """""
@@ -108,21 +109,22 @@ class Area():
             negative_reject_mask = torch.stack(negative_reject_mask_list, dim=0).all(dim=0)
             self.reject_mask = self.reject_mask | negative_reject_mask
 
-        #self.sampled_area = (X[negative_reject_mask], Y[negative_reject_mask])
         self.sampled_area = (X[~self.reject_mask], Y[~self.reject_mask])
         return self.sampled_area
 
-    def __sub__(self, other_bound):
-        for bound in other_bound.bound_list:
+    def __sub__(self, other_area):
+        print(len(other_area.bound_list))
+        bound_list = copy.deepcopy(other_area.bound_list)
+        for bound in bound_list:
             bound.is_inside = not bound.is_inside
-        return Area(self.bound_list, other_bound.bound_list)
+        return Area(self.bound_list, bound_list)
 
-    def __add__(self, other_bound:Bound):
+    def __add__(self, other_bound):
         X = torch.cat([self.sampled_area[0], other_bound.sampled_area[0]], dim=0)
         Y = torch.cat([self.sampled_area[1], other_bound.sampled_area[1]], dim=0)
         return X, Y
 
-
+    @classmethod
     def create_rectangle_bound(cls, x_range:list , y_range:list):
 
         bound_list = [
@@ -134,7 +136,8 @@ class Area():
 
         return cls(bound_list)
 
-    def create_circle_bound(x, y, r):
+    @classmethod
+    def create_circle_bound(cls, x, y, r):
         def func_up(X_tensor):
             return torch.sqrt(r**2 - (X_tensor-x)**2) + y
         def func_down(X_tensor):

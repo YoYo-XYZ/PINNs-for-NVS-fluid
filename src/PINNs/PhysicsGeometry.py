@@ -1,3 +1,6 @@
+from .Geometry import Bound, Area
+from .Physics import NVS
+from .Utility import calc_grad
 class PhysicsGeometry():
     def __init__(self):
         self.is_sampled = False
@@ -160,9 +163,9 @@ if __name__ == "__main__":
         {'p': 101.0}             # func4: outlet (x=2) -> Zero pressure
     ]
     print(physics_cond_list[0])
-    bound1 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[0])
-    bound2 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[1])
-    bound3 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[2])
-    bound4 = PhysicsBound.define_boundary_condition(bound, physics_cond_list[3])
+    bound1 = PhysicsGeometry.define_boundary_condition(bound, physics_cond_list[0])
+    bound2 = PhysicsGeometry.define_boundary_condition(bound, physics_cond_list[1])
+    bound3 = PhysicsGeometry.define_boundary_condition(bound, physics_cond_list[2])
+    bound4 = PhysicsGeometry.define_boundary_condition(bound, physics_cond_list[3])
 
     print(bound1.condition_dict)

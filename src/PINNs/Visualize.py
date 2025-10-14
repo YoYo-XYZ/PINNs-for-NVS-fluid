@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from .Network import *
 from .Geometry import *
-from .Network import *
+from .PhysicsGeometry import *
 
 class Visualizer():
     def __init__(self):
