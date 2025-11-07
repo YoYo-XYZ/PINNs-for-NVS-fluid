@@ -2,8 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from .Network import *
-from .Geometry import *
-from .PhysicsGeometry import *
+from .Geometry import Area
 
 class Visualizer():
     def __init__(self):
@@ -38,21 +37,20 @@ class Visualizer():
         return ax
     
 class Visualization(Visualizer):
-    def __init__(self, bound:PhysicsGeometry, pinns_model:PINN):
+    def __init__(self, bound:Area, pinns_model:PINN):
         super().__init__()
         self.bound = bound
         self.model = pinns_model
         self.data_dict = {}
 
     def sampling_plot_points(self, points_x, points_y):
-        self.X,self.Y = self.bound.sampling_collocation_points([points_x, points_y], False)
+        self.X,self.Y = self.bound.sampling_area([points_x,points_y])
         self.X_np = self.X.detach().numpy().flatten()
         self.Y_np = self.Y.detach().numpy().flatten()
 
-        self.width = self.bound.area_info["sampling_width"]
-        self.length = self.bound.area_info["sampling_length"]
+        self.width = self.bound.sampling_width
+        self.length = self.bound.sampling_length
         self.ratio = self.length/self.width
-        print(self.ratio)
 
     def process_model(self):
         data_dict = {}
@@ -79,7 +77,7 @@ class Visualization(Visualizer):
 
         return fig
     
-    def plotcolor_select(self, key_cmap_dict, s=100):
+    def plotcolor_select(self, key_cmap_dict, s=10):
         key_cmap_dict = Visualization._keycmap_dict_process(key_cmap_dict)
         num_plots = len(key_cmap_dict)
         fig, axes = plt.subplots(1,num_plots, figsize=(6*num_plots*self.ratio,6))

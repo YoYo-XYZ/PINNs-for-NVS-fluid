@@ -2,6 +2,7 @@ import torch
 from .Utility import *
 from .Physics import NVS
 import copy
+from .PhysicsGeometry import PhysicsAttach
 
 def string_to_grad(input:str):
     """""
@@ -13,7 +14,39 @@ def string_to_grad(input:str):
         
     return character_list
 
-class Bound():
+def rectangle(x_range:list , y_range:list):
+    bound_list = [
+        Bound(x_range, lambda x: y_range[0] * torch.ones_like(x), False, ref_axis='x'), # Bottom wall
+        Bound(x_range, lambda x: y_range[1] * torch.ones_like(x), True, ref_axis='x'),  # Top wall
+        Bound(y_range, lambda y: x_range[0] * torch.ones_like(y), False, ref_axis='y'), # Inlet
+        Bound(y_range, lambda y: x_range[1] * torch.ones_like(y), True, ref_axis='y') # Outlet
+    ]
+
+    return Area(bound_list)
+
+def circle(x, y, r):
+    def func_up(X_tensor):
+        return torch.sqrt(r**2 - (X_tensor-x)**2) + y
+    def func_down(X_tensor):
+        return -torch.sqrt(r**2 - (X_tensor-x)**2) + y
+    
+    def func_n_x_up(n):
+        return x + r*torch.cos(n)
+    def func_n_y_up(n):
+        return y + r*torch.sin(n)
+    def func_n_x_down(n):
+        return x + r*torch.cos(n+torch.pi)
+    def func_n_y_down(n):
+        return y + r*torch.sin(n+torch.pi)
+    
+    bound_list = [
+    Bound([x-r,x+r], func_up, True, ref_axis='x', func_n_x=func_n_x_up, func_n_y=func_n_y_up, range_n = [0,torch.pi]),
+    Bound([x-r,x+r], func_down, False, ref_axis='x', func_n_x=func_n_x_down, func_n_y=func_n_y_down, range_n = [0,torch.pi])
+    ]
+
+    return Area(bound_list)
+
+class Bound(PhysicsAttach):
     def __init__(self, range_x, func_x, is_inside, ref_axis='x', func_n_x=None, func_n_y=None, range_n=None):
         self.range_x = range_x
         self.func_x = func_x
@@ -39,8 +72,12 @@ class Bound():
             Y = self.func_n_y(N)
 
         if self.ref_axis == 'x':
+            self.X = X
+            self.Y = Y
             return X, Y
         else:
+            self.X = Y
+            self.Y = X
             return Y, X
     
     def mask_area(self, x, y):
@@ -54,8 +91,7 @@ class Bound():
             reject_mask_y = (y < self.func_x(x))
 
         return reject_mask_x & reject_mask_y
-
-class Area():
+class Area(PhysicsAttach):
     def __init__(self, bound_list: list[Bound], negative_bound_list:list[Bound] = None):
         self.bound_list = bound_list
         self.negative_bound_list = negative_bound_list
@@ -74,9 +110,8 @@ class Area():
 
         self.range_x = [min(range_x), max(range_x)]
         self.range_y = [min(range_y), max(range_y)]
-        self.sampling_width = self.range_x[1] - self.range_x[0]
-        self.sampling_height = self.range_y[1] - self.range_y[0]
-
+        self.sampling_length = self.range_x[1] - self.range_x[0]
+        self.sampling_width = self.range_y[1] - self.range_y[0]
 
     def sampling_area(self, n_points_square, random=False):
         if random:
@@ -109,11 +144,11 @@ class Area():
             negative_reject_mask = torch.stack(negative_reject_mask_list, dim=0).all(dim=0)
             self.reject_mask = self.reject_mask | negative_reject_mask
 
-        self.sampled_area = (X[~self.reject_mask], Y[~self.reject_mask])
-        return self.sampled_area
+        self.X, self.Y = X[~self.reject_mask], Y[~self.reject_mask]
+        self.sampled_area = (self.X, self.Y)
+        return self.X, self.Y
 
     def __sub__(self, other_area):
-        print(len(other_area.bound_list))
         bound_list = copy.deepcopy(other_area.bound_list)
         for bound in bound_list:
             bound.is_inside = not bound.is_inside
@@ -123,37 +158,3 @@ class Area():
         X = torch.cat([self.sampled_area[0], other_bound.sampled_area[0]], dim=0)
         Y = torch.cat([self.sampled_area[1], other_bound.sampled_area[1]], dim=0)
         return X, Y
-
-    @classmethod
-    def create_rectangle_bound(cls, x_range:list , y_range:list):
-
-        bound_list = [
-            Bound(x_range, lambda x: y_range[0] * torch.ones_like(x), False, ref_axis='x'), # Bottom wall
-            Bound(x_range, lambda x: y_range[1] * torch.ones_like(x), True, ref_axis='x'),  # Top wall
-            Bound(y_range, lambda y: x_range[0] * torch.ones_like(y), False, ref_axis='y'), # Inlet
-            Bound(y_range, lambda y: x_range[1] * torch.ones_like(y), True, ref_axis='y') # Outlet
-        ]
-
-        return cls(bound_list)
-
-    @classmethod
-    def create_circle_bound(cls, x, y, r):
-        def func_up(X_tensor):
-            return torch.sqrt(r**2 - (X_tensor-x)**2) + y
-        def func_down(X_tensor):
-            return -torch.sqrt(r**2 - (X_tensor-x)**2) + y
-        
-        def func_n_x_up(n):
-            return x + r*torch.cos(n)
-        def func_n_y_up(n):
-            return y + r*torch.sin(n)
-        def func_n_x_down(n):
-            return x + r*torch.cos(n+torch.pi)
-        def func_n_y_down(n):
-            return y + r*torch.sin(n+torch.pi)
-        
-        bound_list = [
-        Bound([x-r,x+r], func_up, True, ref_axis='x', func_n_x=func_n_x_up, func_n_y=func_n_y_up, range_n = [0,torch.pi]),
-        Bound([x-r,x+r], func_down, False, ref_axis='x', func_n_x=func_n_x_down, func_n_y=func_n_y_down, range_n = [0,torch.pi])
-        ]
-        return cls(bound_list)
