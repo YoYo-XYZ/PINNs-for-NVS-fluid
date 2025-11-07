@@ -19,7 +19,6 @@ class PDE():
         loss = torch.mean(loss)
         return loss
 
-
 class NVS(PDE):
     def __init__(self, vu=0.001/1000, rho=1000.0):
         super().__init__()
