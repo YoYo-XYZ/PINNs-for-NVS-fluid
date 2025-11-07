@@ -15,12 +15,11 @@ class ProblemDomain():
     def sampling_uniform(self, bound_sampling_res:list, area_sampling_res:list):
         self.sampling_option = 'uniform'
         print('sampling')
-
         for i, bound in enumerate(self.bound_list):
             bound.sampling_line(bound_sampling_res[i])
             bound.process_coordinates()
         for i, area in enumerate(self.area_list):
-            area.sampling_area(area_sampling_res)
+            area.sampling_area(area_sampling_res[i])
             area.process_coordinates()
 
     def sampling_random_r(self, bound_sampling_res:list, area_sampling_res:list):
