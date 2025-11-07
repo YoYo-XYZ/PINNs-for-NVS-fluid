@@ -1,41 +1,33 @@
-from .Physics import NVS
+from .Physics import PDE
 from .Utility import calc_grad
 import torch
 
 class PhysicsAttach():
     def __init__(self):
-        self.bound = bound
-
         self.is_sampled = False
-        self.physics_type_key = {'BC':0, 'IC':1, 'PDE':2}
-
-    @staticmethod
-    def sampling_time(range_t, n_points, random=False):
-        range_t = range_t
-        if random:
-            t = torch.empty(n_points, 1).uniform_(range_t[0], range_t[1])
-        else:
-            t = torch.linspace(range_t[0], range_t[1], n_points).unsqueeze(1)
-        return t
 #----------------------------------------------------------------------------------------------- usual conditions
     def define_bc(self, condition_dict: dict, range_t=None):
+        """Define boundary conditions (BC)."""
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
         self.range_t = range_t
         self.physics_type = "BC"
     
     def define_ic(self, condition_dict:dict, t=0.0):
+        """Define initial conditions (IC)."""
         self.condition_dict = condition_dict
         self.condition_num = len(condition_dict)
         self.t = t
         self.physics_type = "IC"
     
-    def define_pde(self, PDE_class:NVS, range_t=None):
+    def define_pde(self, PDE_class:PDE, range_t=None):
+        """Define the PDE to enforce."""
         self.range_t = range_t
         self.PDE = PDE_class
         self.physics_type = "PDE"
-
+#----------------------------------------------------------------------------------------------- input to PINNs
     def sampling_time(self, n_points, random=False):
+        """Define the PDE to enforce."""
         if self.range_t is None:
             self.t = None
         else:
@@ -45,6 +37,7 @@ class PhysicsAttach():
                 self.t = torch.linspace()
 
     def process_coordinates(self):
+        """Prepare coordinates data to be feed to PINNs"""
         self.X_ = self.X[:,None].requires_grad_()
         self.Y_ = self.Y[:,None].requires_grad_()
 
@@ -56,21 +49,20 @@ class PhysicsAttach():
             
         if self.physics_type == "IC" or self.physics_type == "BC":
             target_output_tensor_dict = {}
-            for key in self.condition_dict:
-                if isinstance(self.condition_dict[key],(float,int)): #constant condition
+
+            for key in self.condition_dict: #loop over condition
+                if isinstance(self.condition_dict[key],(float,int)): #if condition is constant
                     target_output_tensor_dict[key] = self.condition_dict[key] * torch.ones_like(self.X_)
-                else: #function condition
+                else: #if condition varies function
                     variable_key = self.condition_dict[key][0]
                     func = self.condition_dict[key][1]
                     target_output_tensor_dict[key] = func(self.inputs_tensor_dict[variable_key].detach().clone())
             self.target_output_tensor_dict = target_output_tensor_dict
 
         return self.inputs_tensor_dict
-
-#-----------------------------------------------------------------------------------------------process model's output and calculating loss
+#----------------------------------------------------------------------------------------------- process model's output and calculating loss
     def calc_output(self, model):
-        """"Post-process the model's output based on the target_dict keys."""
-        self.process_coordinates()
+        """"Post-process the model's output to get predict (based from target_output_dict.)"""
         prediction_dict = model(self.inputs_tensor_dict)
         pred_dict = {}
 
@@ -83,8 +75,8 @@ class PhysicsAttach():
         return pred_dict
     
     def calc_loss(self, model, loss_fn=None):
-
-        if self.physics_type == "IC" or self.physics_type == "BC":
+        """Calculate loss from PINNs output"""
+        if self.physics_type == "IC" or self.physics_type == "BC": 
             pred_dict = self.calc_output(model)
 
             loss = 0
@@ -97,14 +89,12 @@ class PhysicsAttach():
             self.process_pde()
             return self.PDE.calc_loss()
 
-
-#-----------------------------------------------------------------------------------------------process PDE related value
-    def pde_define(self, pde_class):
-        self.PDE = pde_class
+#----------------------------------------------------------------------------------------------- process PDE related value
     def process_model(self, model):
-        self.process_coordinates()
+        """feeds the inputs data to the model, returning model's output"""
         self.model_inputs = self.inputs_tensor_dict
         self.model_outputs = model(self.inputs_tensor_dict)
         return self.model_outputs
+        
     def process_pde(self):
         self.PDE.calc_residual(inputs_dict=self.model_inputs | self.model_outputs)

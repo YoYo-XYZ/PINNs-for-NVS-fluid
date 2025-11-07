@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from .Network import *
-from .Geometry import Area
+from .Geometry import Area, Bound
 
 class Visualizer():
     def __init__(self):
@@ -54,6 +54,7 @@ class Visualization(Visualizer):
 
     def process_model(self):
         data_dict = {}
+        self.bound.process_coordinates()
 
         # main outputs
         data_dict = data_dict | self.bound.process_model(self.model)
@@ -120,3 +121,4 @@ class Visualization(Visualizer):
                 cmap = plot_dict[key]
             key_and_cmap_dict[key] = cmap
         return key_and_cmap_dict
+    

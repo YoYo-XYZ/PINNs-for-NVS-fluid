@@ -1,8 +1,8 @@
 import torch
 from .Utility import *
-from .Physics import NVS
+from .Physics import PDE, NVS
 import copy
-from .PhysicsGeometry import PhysicsAttach
+from .PhysicsInformedAttach import PhysicsAttach
 
 def string_to_grad(input:str):
     """""
