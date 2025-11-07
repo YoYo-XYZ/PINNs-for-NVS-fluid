@@ -75,7 +75,7 @@ class ProblemDomain():
 
         for i, area in enumerate(self.area_list): #plot areas
             area.sampling_area(area_sampling_res[i])
-            plt.scatter(area.X,area.Y,s=5, color='black', alpha=0.3, marker='s')
+            plt.scatter(area.X,area.Y,s=2, color='black', alpha=0.3, marker='s')
             plt.text(
                 area.sampling_length/2,
                 area.sampling_width/2,
@@ -89,7 +89,7 @@ class ProblemDomain():
             )
         for i, bound in enumerate(self.bound_list): #plot bounds
             x, y = bound.sampling_line(bound_sampling_res[i])
-            plt.scatter(x,y,s=5, color='red', alpha=0.5)
+            plt.scatter(x,y,s=2, color='red', alpha=0.5)
             plt.text(
                 x[len(x)//2],
                 y[len(y)//2],
