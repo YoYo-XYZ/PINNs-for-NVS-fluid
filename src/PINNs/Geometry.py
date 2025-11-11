@@ -48,6 +48,7 @@ def circle(x, y, r):
 
 class Bound(PhysicsAttach):
     def __init__(self, range_x, func_x, is_inside, ref_axis='x', func_n_x=None, func_n_y=None, range_n=None):
+        super().__init__()
         self.range_x = range_x
         self.func_x = func_x
         self.is_inside = is_inside
@@ -56,6 +57,22 @@ class Bound(PhysicsAttach):
         self.func_n_x = func_n_x #for circle
         self.func_n_y = func_n_y
         self.range_n = range_n
+
+        if ref_axis == 'x':
+            range_true_x = range_x
+            range_true_y = [float(min(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy())),
+                        float(max(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy()))]
+        elif ref_axis == 'y':
+            range_true_y = range_x
+            range_true_x = [float(min(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy())),
+                            float(max(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy()))]
+
+        self.length = range_true_x[1] - range_true_x[0]
+        self.width = range_true_y[1] - range_true_y[0]
+
+        self.x_center = range_true_x[0] + self.length / 2
+        self.y_center = range_true_y[0] + self.width / 2
+
     def sampling_line(self, n_points, random=False):
         if self.func_n_x is None:
             if random:
@@ -93,6 +110,7 @@ class Bound(PhysicsAttach):
         return reject_mask_x & reject_mask_y
 class Area(PhysicsAttach):
     def __init__(self, bound_list: list[Bound], negative_bound_list:list[Bound] = None):
+        super().__init__()
         self.bound_list = bound_list
         self.negative_bound_list = negative_bound_list
 
@@ -101,17 +119,21 @@ class Area(PhysicsAttach):
         for bound in bound_list:
             if bound.ref_axis == 'x':
                 range_x += bound.range_x
-                range_y += [float(min(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],100000)).detach().numpy())),
-                            float(max(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],100000)).detach().numpy()))]
+                range_y += [float(min(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy())),
+                            float(max(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()))]
             elif bound.ref_axis == 'y':
                 range_y += bound.range_x
-                range_x += [float(min(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],100000)).detach().numpy())),
-                             float(max(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],100000)).detach().numpy()))]
+                range_x += [float(min(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy())),
+                             float(max(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()))]
 
         self.range_x = [min(range_x), max(range_x)]
         self.range_y = [min(range_y), max(range_y)]
-        self.sampling_length = self.range_x[1] - self.range_x[0]
-        self.sampling_width = self.range_y[1] - self.range_y[0]
+
+        self.length = self.range_x[1] - self.range_x[0]
+        self.width = self.range_y[1] - self.range_y[0]
+
+        self.x_center = self.range_x[0] + self.length / 2
+        self.y_center = self.range_y[0] + self.width / 2
 
     def sampling_area(self, n_points_square, random=False):
         if random:

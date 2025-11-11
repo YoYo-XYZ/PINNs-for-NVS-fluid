@@ -1,9 +1,11 @@
 pyproject.toml
 readme.md
 setup.py
+src/PINNs/Geometry.py
 src/PINNs/Network.py
+src/PINNs/PINNmethod.py
 src/PINNs/Physics.py
-src/PINNs/PointSampling.py
+src/PINNs/PhysicsInformedAttach.py
 src/PINNs/Utility.py
 src/PINNs/Visualize.py
 src/PINNs/__init__.py

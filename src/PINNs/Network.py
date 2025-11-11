@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 class PINN(nn.Module):
     """
     Physics-Informed Neural Network model.
@@ -35,7 +36,6 @@ class PINN(nn.Module):
 
     def forward(self, inputs_dict):
         """Forward pass through the network."""
-
         if self.is_steady:
             input_tensor = torch.cat([inputs_dict[key] for key in self.input_key], dim=1)
         else:
@@ -62,7 +62,7 @@ class NetworkTrainer():
         return loss_hist_dict
     
     @staticmethod
-    def train_adam(model, learning_rate, epochs, calc_loss, print_every=10):
+    def train_adam(model, learning_rate, epochs, calc_loss, print_every=10, thereshold_loss=None):
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(epochs):
             optimizer.zero_grad()
@@ -74,23 +74,41 @@ class NetworkTrainer():
 
             if epoch % print_every == 0:
                 model.show_updates()
+
+            if model.loss_history_dict['total_loss'][-1] < thereshold_loss:
+                print(f"Training stopped at epoch {epoch} as total loss reached the threshold of {thereshold_loss}.")
+                break
         return model
 
     @staticmethod
-    def train_lbfgs(model, epochs, calc_loss, print_every=10):
-        optimizer = torch.optim.LBFGS(model.parameters(), history_size=50, max_iter=20, line_search_fn="strong_wolfe")
+    def train_lbfgs(model, epochs, calc_loss, print_every=10, thereshold_loss=None):
+        optimizer = torch.optim.LBFGS(model.parameters(), history_size=20, max_iter=10, line_search_fn="strong_wolfe")
+        
         for epoch in range(epochs):
+            # Create a closure that captures loss_dict
+            loss_dict_container = {}
+            
             def closure():
                 optimizer.zero_grad()
-                loss_dict = calc_loss()
+                loss_dict = calc_loss(model)
                 loss_dict['total_loss'].backward()
-                closure.loss_dict = loss_dict
+                # Store loss_dict in the container
+                loss_dict_container['loss_dict'] = loss_dict
                 return loss_dict['total_loss']
+            
             optimizer.step(closure)
-            loss_dict = closure.loss_dict
+            
+            # Retrieve the loss_dict from the container
+            loss_dict = loss_dict_container['loss_dict']
             model.loss_history_dict = NetworkTrainer.record_loss(model.loss_history_dict, loss_dict)
+            
             if epoch % print_every == 0:
                 model.show_updates()
+            
+            if thereshold_loss is not None and model.loss_history_dict['total_loss'][-1] < thereshold_loss:
+                print(f"Training stopped at epoch {epoch} as total loss reached the threshold of {thereshold_loss}.")
+                break
+        
         return model
 
 
