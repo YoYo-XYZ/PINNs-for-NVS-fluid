@@ -1,17 +1,22 @@
 from .Geometry import Area, Bound
 import matplotlib.pyplot as plt
-
+import torch
+import sympy as sp
 class ProblemDomain():
     def __init__(self, bound_list:list[Bound], area_list:list[Area]):
         self.bound_list = bound_list
         self.area_list = area_list
-        self.N = 0
         self.sampling_option = None
     
     def _format_condition_dict(self, obj, obj_type="Bound"):
         """Helper function to format condition dictionary for display."""
+
+        def func_to_latex(func_list):
+            v = func_list
+            return f"${str(sp.latex(v[1](sp.symbols(v[0]))))}$"
+
         if hasattr(obj, 'condition_dict'):
-            conditions = ', '.join([f"{k}={v}" for k, v in obj.condition_dict.items()])
+            conditions = ', '.join([f"{k}={(str(v) if isinstance(v,(float,int)) else func_to_latex(v))}" for k, v in obj.condition_dict.items()])
             return conditions
         elif hasattr(obj, 'PDE'):
             return f"PDE: {obj.PDE.__class__.__name__}"
@@ -19,7 +24,9 @@ class ProblemDomain():
         
     def __str__(self):
         return f"""number of bound : {len(self.bound_list)}
-        , number of area : {len(self.area_list)}"""
+        {[f'{i}: {len(bound.X)}' for i, bound in enumerate(self.bound_list)]}
+        , number of area : {len(self.area_list)}
+        {[f'{i}: {len(area.X)}' for i, area in enumerate(self.area_list)]}"""
 
     def sampling_uniform(self, bound_sampling_res:list, area_sampling_res:list, device='cpu'):
         self.sampling_option = 'uniform'
@@ -38,7 +45,51 @@ class ProblemDomain():
         for i, area in enumerate(self.area_list):
             area.sampling_area(area_sampling_res[i], random=True)
             area.process_coordinates(device)
-        self.N += 1
+
+    def sampling_RAR(self, bound_top_k_list:list, area_top_k_list:list, model, bound_candidates_num_list:list=None, area_candidates_num_list:list=None, device='cpu'):
+        self.sampling_option = self.sampling_option + ' + RAR'
+        for i, bound in enumerate(self.bound_list):
+            if bound_candidates_num_list is None:
+                bound.sampling_residual_based(bound_top_k_list[i], model)
+            else:
+                # Create a temporary copy by saving current state
+                original_X = bound.X.clone() if hasattr(bound, 'X') else None
+                original_Y = bound.Y.clone() if hasattr(bound, 'Y') else None
+                
+                # Sample new candidates
+                bound.sampling_line(bound_candidates_num_list[i], random=True)
+                bound.process_coordinates(device)
+                X, Y = bound.sampling_residual_based(bound_top_k_list[i], model)
+                
+                # Restore and concatenate
+                if original_X is not None:
+                    bound.X = torch.cat([original_X, X])
+                    bound.Y = torch.cat([original_Y, Y])
+                else:
+                    bound.X = X
+                    bound.Y = Y
+            bound.process_coordinates(device)
+        for i, area in enumerate(self.area_list):
+            if area_candidates_num_list is None:
+                area.sampling_residual_based(area_top_k_list[i], model)
+            else:
+                # Create a temporary copy by saving current state
+                original_X = area.X.clone() if hasattr(area, 'X') else None
+                original_Y = area.Y.clone() if hasattr(area, 'Y') else None
+                
+                # Sample new candidates
+                area.sampling_area(area_candidates_num_list[i], random=True)
+                area.process_coordinates(device)
+                X, Y = area.sampling_residual_based(area_top_k_list[i], model)
+                
+                # Restore and concatenate
+                if original_X is not None:
+                    area.X = torch.cat([original_X, X])
+                    area.Y = torch.cat([original_Y, Y])
+                else:
+                    area.X = X
+                    area.Y = Y
+            area.process_coordinates(device)
 #------------------------------------------------------------------------------------------------
     def show_coordinates(self):
         plt.figure(figsize=(20,20))
@@ -51,7 +102,7 @@ class ProblemDomain():
                 area.x_center,
                 area.y_center,
                 label,
-                fontsize=15,
+                fontsize=16,
                 color='navy',
                 fontstyle='italic',
                 fontweight='bold',
@@ -68,7 +119,7 @@ class ProblemDomain():
                 bound.x_center,
                 bound.y_center,
                 label,
-                fontsize=15,
+                fontsize=16,
                 color='darkgreen',
                 fontstyle='italic',
                 fontweight='bold',
@@ -97,7 +148,7 @@ class ProblemDomain():
                 area.x_center,
                 area.y_center,
                 label,
-                fontsize=25,
+                fontsize=16,
                 color='navy',
                 fontstyle='italic',
                 fontweight='bold',
@@ -115,7 +166,7 @@ class ProblemDomain():
                 bound.x_center,
                 bound.y_center,
                 label,
-                fontsize=25,
+                fontsize=16,
                 color='darkgreen',
                 fontstyle='italic',
                 fontweight='bold',

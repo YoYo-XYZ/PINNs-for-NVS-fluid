@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import copy
 
 class PINN(nn.Module):
     """
@@ -62,7 +63,12 @@ class NetworkTrainer():
         return loss_hist_dict
     
     @staticmethod
-    def train_adam(model, learning_rate, epochs, calc_loss, print_every=10, thereshold_loss=None):
+    def train_adam(model, learning_rate, epochs, calc_loss, print_every=50, thereshold_loss=None, device= 'cpu'):
+        model = copy.deepcopy(model.to(device))
+        if device == 'cuda':
+            torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
+            print('model is compiled for cuda')
+
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
         for epoch in range(epochs):
             optimizer.zero_grad()
@@ -78,12 +84,16 @@ class NetworkTrainer():
             if model.loss_history_dict['total_loss'][-1] < thereshold_loss:
                 print(f"Training stopped at epoch {epoch} as total loss reached the threshold of {thereshold_loss}.")
                 break
-        return model
+        return model.to(device)
 
     @staticmethod
-    def train_lbfgs(model, epochs, calc_loss, print_every=10, thereshold_loss=None):
+    def train_lbfgs(model, epochs, calc_loss, print_every=50, thereshold_loss=None, device= 'cpu'):
+        model = copy.deepcopy(model.to(device))
+        if device == 'cuda':
+            torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
+            print('model is compiled for cuda')
+
         optimizer = torch.optim.LBFGS(model.parameters(), history_size=20, max_iter=10, line_search_fn="strong_wolfe")
-        
         for epoch in range(epochs):
             # Create a closure that captures loss_dict
             loss_dict_container = {}

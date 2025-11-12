@@ -99,7 +99,7 @@ class PhysicsAttach():
 
             loss_field = 0
             for key in pred_dict:
-                loss_field += (pred_dict[key] - self.target_output_tensor_dict[key])**2
+                loss_field += abs(pred_dict[key] - self.target_output_tensor_dict[key])
         
         elif self.physics_type == "PDE":
             self.process_model(model)
@@ -113,11 +113,15 @@ class PhysicsAttach():
         self.loss_thereshold = loss
         self.top_k_loss_thereshold = top_k_loss
 
-    def sampling_residual_based(self, top_k:int):
+    def sampling_residual_based(self, top_k:int, model): #need more optimized
         """Add sampling points based on residual loss"""
-        _, top_k_index = torch.topk(self.loss_field ,top_k)
-        self.X = torch.cat(self.X, self.X[top_k_index])
-        self.Y = torch.cat(self.X, self.X[top_k_index])
+        self.calc_loss_field(model) #TODO: NEED TO AVOID REPETETIVE CAL LOSS
+        _, top_k_index = torch.topk(self.loss_field ,top_k, dim=0)
+        top_k_index = top_k_index.flatten().to('cpu')
+        self.X = torch.cat([self.X, self.X[top_k_index]])
+        self.Y = torch.cat([self.Y, self.Y[top_k_index]])
+
+        return self.X[top_k_index], self.Y[top_k_index]
 
 #----------------------------------------------------------------------------------------------- process PDE related value
     def process_model(self, model):

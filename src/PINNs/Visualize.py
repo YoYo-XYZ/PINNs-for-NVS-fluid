@@ -91,7 +91,7 @@ class Visualizer(Template):
         if self.geometry.physics_type == 'PDE':
             data_dict = data_dict |self.geometry.PDE.var
         if self.geometry.physics_type is not None:
-            data_dict[f"{self.geometry.physics_type} residual"] = torch.sqrt(self.geometry.calc_loss_raw(self.model)) # residual
+            data_dict[f"{self.geometry.physics_type} residual"] = torch.sqrt(self.geometry.calc_loss_field(self.model)) # residual
         self.data_dict = data_dict
 
         print(f"available_data: {tuple(self.data_dict.keys())+tuple(self.model.loss_history_dict.keys())}")

@@ -7,19 +7,19 @@ class PDE():
 
     def calc_residual_field(self):
         residuals_field = 0
-        for residual_field in self.residuals_field:
+        for residual_field in self.residual_fields:
             residuals_field += torch.abs(residual_field)
         return residuals_field
 
     def cal_loss_field(self):
         loss_field = 0
-        for residual_field in self.residuals_field:
+        for residual_field in self.residual_fields:
             loss_field += residual_field**2
         return loss_field
 
     def calc_loss(self):
         loss_field = 0
-        for residual_field in self.residuals_field:
+        for residual_field in self.residual_fields:
             loss_field += residual_field**2
         loss = torch.mean(loss_field)
         return loss
@@ -92,9 +92,9 @@ class NVS(PDE):
                                 self.vu * (v_xx + v_yy) +
                                 p_y / self.rho)    
 
-        self.residuals_field = (mass_residual, x_momentum_residual, y_momentum_residual)
+        self.residual_fields = (mass_residual, x_momentum_residual, y_momentum_residual)
 
-        return self.residuals_field
+        return self.residual_fields
 
 class NVS_nondimensional(PDE):
     def __init__(self, U, L, mu, rho):
@@ -106,7 +106,7 @@ class NVS_nondimensional(PDE):
         self.Re = rho*U*L/mu
         self.var = {}
 
-    def calc_residual(self, inputs_dict):
+    def calc(self, inputs_dict):
         x = inputs_dict['x']
         y = inputs_dict['y']
         t = inputs_dict['t']
@@ -148,28 +148,28 @@ class NVS_nondimensional(PDE):
         if t is None:
             # X-momentum equation
             x_momentum_residual = (u * u_x + v * u_y -
-                                (1/self.Re) * (u_xx + u_yy) +
+                                (u_xx + u_yy)/self.Re +
                                 p_x)
                                 
             # Y-momentum equation
             y_momentum_residual = (u * v_x + v * v_y -
-                                (1/self.Re) * (v_xx + v_yy) +
+                                (v_xx + v_yy)/self.Re +
                                 p_y)
 
         else:
             # X-momentum equation
             x_momentum_residual = (u_t + u * u_x + v * u_y -
-                                (1/self.Re) * (u_xx + u_yy) +
+                                (u_xx + u_yy)/self.Re +
                                 p_x)
                                 
             # Y-momentum equation
             y_momentum_residual = (v_t + u * v_x + v * v_y -
-                                (1/self.Re) * (v_xx + v_yy) +
+                                (v_xx + v_yy)/self.Re +
                                 p_y)    
 
-        self.residuals = (mass_residual, x_momentum_residual, y_momentum_residual)
+        self.residual_fields = (mass_residual, x_momentum_residual, y_momentum_residual)
 
-        return self.residuals
+        return self.residual_fields
 
     def dimensionalize(self):
         self.var['x'] = self.var['x'] / self.L
@@ -179,6 +179,15 @@ class NVS_nondimensional(PDE):
         self.var['p'] = self.var['p'] / (self.rho*self.U**2)
         if self.var['t']:
             self.var['t'] = self.var['t'] * self.U/self.L
+
+    def non_dimensionalize(self):
+        self.var['x'] = self.var['x'] * self.L
+        self.var['y'] = self.var['y'] * self.L
+        self.var['u'] = self.var['u'] * self.U
+        self.var['v'] = self.var['v'] * self.U
+        self.var['p'] = self.var['p'] * (self.rho*self.U**2)
+        if self.var['t']:
+            self.var['t'] = self.var['t'] / (self.U/self.L)
 
 class Heat(PDE):
     def __init__(self, alpha=0.01):

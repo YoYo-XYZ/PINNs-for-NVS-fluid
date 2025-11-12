@@ -60,12 +60,16 @@ class Bound(PhysicsAttach):
 
         if ref_axis == 'x':
             range_true_x = range_x
-            range_true_y = [float(min(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy())),
-                        float(max(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy()))]
+            if self.func_n_x is not None:
+                _, f_x = self.sampling_line(10000)
+                f_x = f_x.detach().numpy()
+            else:
+                f_x = self.func_x(torch.linspace(self.range_x[0], self.range_x[1],10000)).detach().numpy()
+            range_true_y = [float(min(f_x)),float(max(f_x))]
         elif ref_axis == 'y':
             range_true_y = range_x
-            range_true_x = [float(min(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy())),
-                            float(max(func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy()))]
+            F_y = func_x(torch.linspace(range_x[0], range_x[1],1000)).detach().numpy()
+            range_true_x = [float(min(F_y)), float(max(F_y))]
 
         self.length = range_true_x[1] - range_true_x[0]
         self.width = range_true_y[1] - range_true_y[0]
@@ -119,12 +123,16 @@ class Area(PhysicsAttach):
         for bound in bound_list:
             if bound.ref_axis == 'x':
                 range_x += bound.range_x
-                range_y += [float(min(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy())),
-                            float(max(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()))]
+                if bound.func_n_x is not None:
+                    _, f_x = bound.sampling_line(10000)
+                    f_x = f_x.detach().numpy()
+                else:
+                    f_x = bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()
+                range_y += [float(min(f_x)),float(max(f_x))]
             elif bound.ref_axis == 'y':
                 range_y += bound.range_x
-                range_x += [float(min(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy())),
-                             float(max(bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()))]
+                F_y = bound.func_x(torch.linspace(bound.range_x[0], bound.range_x[1],10000)).detach().numpy()
+                range_x += [float(min(F_y)),float(max(F_y))]
 
         self.range_x = [min(range_x), max(range_x)]
         self.range_y = [min(range_y), max(range_y)]
