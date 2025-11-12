@@ -91,13 +91,32 @@ class ProblemDomain():
                     area.Y = Y
             area.process_coordinates(device)
 #------------------------------------------------------------------------------------------------
-    def show_coordinates(self):
+    def save_coordinates(self):
+        for i, area in enumerate(self.area_list):
+            area.saved_X = area.X.clone()
+            area.saved_Y = area.Y.clone()
+        for i, bound in enumerate(self.bound_list):
+            bound.saved_X = bound.X.clone()
+            bound.saved_Y = bound.Y.clone()
+    
+    def load_coordinates(self):
+        for i, area in enumerate(self.area_list):
+            area.X = area.saved_X.clone()
+            area.Y = area.saved_Y.clone()
+        for i, bound in enumerate(self.bound_list):
+            bound.X = bound.saved_X.clone()
+            bound.Y = bound.saved_Y.clone()
+    
+    def show_coordinates(self, display_conditions=False):
         plt.figure(figsize=(20,20))
         
         for i, area in enumerate(self.area_list): #plot areas
             plt.scatter(area.X,area.Y,s=2, color='black', alpha=0.3)
-            condition_str = self._format_condition_dict(area, "Area")
-            label = f"Area {i}\n{condition_str}" if condition_str else f"Area {i}"
+            if display_conditions:
+                condition_str = self._format_condition_dict(area, "Area")
+                label = f"Area {i}\n{condition_str}" if condition_str else f"Area {i}"
+            else:
+                label = None
             plt.text(
                 area.x_center,
                 area.y_center,
@@ -113,8 +132,11 @@ class ProblemDomain():
             )
         for i, bound in enumerate(self.bound_list): #plot bounds
             plt.scatter(bound.X,bound.Y,s=5, color='red', alpha=0.5)
-            condition_str = self._format_condition_dict(bound, "Bound")
-            label = f"Bound {i}\n{condition_str}" if condition_str else f"Bound {i}"
+            if display_conditions:
+                condition_str = self._format_condition_dict(bound, "Bound")
+                label = f"Bound {i}\n{condition_str}" if condition_str else f"Bound {i}"
+            else:
+                label = None
             plt.text(
                 bound.x_center,
                 bound.y_center,
@@ -135,13 +157,13 @@ class ProblemDomain():
         plt.figure(figsize=(20,20))
         
         if bound_sampling_res is None:
-            bound_sampling_res = [int((bound.range_x[1] - bound.range_x[0])/0.008) for bound in self.bound_list]
+            bound_sampling_res = [int(800*(bound.range_x[1] - bound.range_x[0])) for bound in self.bound_list]
         if area_sampling_res is None:
-            area_sampling_res = [[int(area.length/0.008), int(area.width/0.008)] for area in self.area_list]
+            area_sampling_res = [[400, int(400*area.width/area.length)] for area in self.area_list]
 
         for i, area in enumerate(self.area_list): #plot areas
             area.sampling_area(area_sampling_res[i])
-            plt.scatter(area.X,area.Y,s=2, color='black', alpha=0.2, marker='s')
+            plt.scatter(area.X,area.Y,s=5, color='black', alpha=0.2, marker='s')
             condition_str = self._format_condition_dict(area, "Area")
             label = f"Area {i}\n{condition_str}" if condition_str else f"Area {i}"
             plt.text(

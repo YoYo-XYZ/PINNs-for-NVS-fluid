@@ -4,6 +4,7 @@ import numpy as np
 from .Network import *
 from .Geometry import Area, Bound
 from .PhysicsInformedAttach import PhysicsAttach
+from mpl_toolkits.mplot3d import Axes3D
 
 class Template():
     def __init__(self):
@@ -14,11 +15,6 @@ class Template():
         ax.set_title(title, fontweight='medium', pad=10, fontsize=13)
         ax.set_xlabel('x', fontstyle='italic', labelpad=0)
         ax.set_ylabel('y', fontstyle='italic', labelpad=0)
-
-        # # Create a dedicated axis for the colorbar for better fitting
-        # from mpl_toolkits.axes_grid1 import make_axes_locatable
-        # divider = make_axes_locatable(ax)
-        # cax = divider.append_axes("right", size="2%", pad=0.2)
 
         plt.colorbar(im, pad=0.03, shrink=1.2)
 
@@ -52,12 +48,13 @@ class Template():
         return ax
     
 class Visualizer(Template):
-    def __init__(self, pinns_model:PINN, geometry:Area|Bound):
+    def __init__(self, pinns_model:PINN, geometry:Area|Bound, device='cpu'):
         super().__init__()
-        self.model = pinns_model.to('cpu')
+        self.model = pinns_model.to(device)
         self.data_dict = {}
         self.geometry = geometry
         self.is_preprocessed = False
+        self.device = device
 
     def sampling_line(self, n_points:int):
         self.geometry.sampling_line(n_points)
@@ -65,8 +62,8 @@ class Visualizer(Template):
     def sampling_area(self, n_points_square:list[int]):
         self.geometry.sampling_area(n_points_square)
 
-    def preprocess(self):
-        self.is_preprocessed = True
+    def postprocess(self, torch_to_numpy = False):
+        self.is_postprocessed = True
 
         self.X,self.Y = self.geometry.X, self.geometry.Y
         self.X_np = self.X.detach().numpy().flatten()
@@ -82,7 +79,7 @@ class Visualizer(Template):
             self.ratio = 5
 
         data_dict = {}
-        self.geometry.process_coordinates(device = 'cpu')
+        self.geometry.process_coordinates(self.device)
 
         # Possible Outputs -> store in data dict
         data_dict = data_dict | self.geometry.process_model(self.model)
@@ -94,7 +91,10 @@ class Visualizer(Template):
             data_dict[f"{self.geometry.physics_type} residual"] = torch.sqrt(self.geometry.calc_loss_field(self.model)) # residual
         self.data_dict = data_dict
 
-        print(f"available_data: {tuple(self.data_dict.keys())+tuple(self.model.loss_history_dict.keys())}")
+        for key in self.data_dict:
+            self.data_dict[key] = self.data_dict[key].detach().numpy().flatten()
+
+        print(f"available_data: {tuple(self.data_dict.keys())}")
     
     def plot_data_on_geometry(self, key_cmap_dict, s=10, orientation='vertical', range_x:list=None, range_y:list=None):
         key_cmap_dict = self._keycmap_dict_process(key_cmap_dict)
@@ -107,8 +107,7 @@ class Visualizer(Template):
             axes = [axes]
 
         for i, (key,data) in enumerate(key_cmap_dict.items()):
-            #print(self.X_np,self.Y_np, self.data_dict[key].detach().numpy().flatten())
-            self.colorplot(self.X_np,self.Y_np, self.data_dict[key].detach().numpy().flatten(),axes[i],key,data,s=s)
+            self.colorplot(self.X_np,self.Y_np, self.data_dict[key],axes[i],key,data,s=s)
             axes[i].set_aspect('equal', adjustable='box')
             if range_x is None or range_y is None:
                 axes[i].set_xlim(self.geometry.range_x[0], self.geometry.range_x[1])
@@ -120,30 +119,54 @@ class Visualizer(Template):
         plt.show()
         return fig
 
-    def plot_data(self, key_list):
-        num_plots = len(key_list)
-        fig, axes = plt.subplots(num_plots, 1)
-        if num_plots == 1:
-            axes = [axes]
-        for i, key in enumerate(key_list):
-            coord = self.Y_np if self.geometry.ref_axis == 'y' else self.X_np
-            self.lineplot(coord, self.data_dict[key].detach().numpy().flatten(), axes[i],self.geometry.ref_axis, key)
+    def plot_data(self, key_list, s=10, orientation='vertical', range_x:list=None, range_y:list=None):
+        if  isinstance(self.geometry, Bound):
+            num_plots = len(key_list)
+            fig, axes = plt.subplots(num_plots, 1)
+            if num_plots == 1:
+                axes = [axes]
+            for i, key in enumerate(key_list):
+                coord = self.Y_np if self.geometry.ref_axis == 'y' else self.X_np
+                self.lineplot(coord, self.data_dict[key], axes[i],self.geometry.ref_axis, key)
 
-        plt.tight_layout()
-        plt.show()
-        return fig
+            plt.tight_layout()
+            plt.show()
+            return fig
+        
+        elif isinstance(self.geometry, Area):
+            num_plots = len(key_list)
+            fig = plt.figure(figsize=(8 * num_plots, 6))
 
+            for i, key in enumerate(key_list):
+                ax = fig.add_subplot(1, num_plots, i + 1, projection='3d')
 
+                # Create a surface plot
+                z = self.data_dict[key]
+                ax.scatter(self.X_np, self.Y_np, z, c=z, cmap='viridis', marker='.')
+
+                ax.set_xlabel('x')
+                ax.set_ylabel('y')
+                ax.set_zlabel(key)
+                ax.set_title(f'3D Surface Plot of {key}')
+
+            plt.tight_layout()
+            plt.show()
+            return fig
+
+        else:
+            print("Plotting for this sample dimension is not supported.")
+            return None
 
     def plot_residual_distribution(self):
         fig, ax = plt.subplots()
         ax = plt.subplot()
-        self.histplot(self.data_dict[f"{self.geometry.physics_type} residual"].detach().numpy().flatten(), ax, "abs PDE residual", bins = 100)
+        self.histplot(self.data_dict[f"{self.geometry.physics_type} residual"], ax, "abs PDE residual", bins = 100)
         plt.show()
 
         return fig
     
     def plot_loss_residual_evolution(self, log_scale=False, linewidth = 0.1):
+        print("not implemented yet")
         pass
 
     def plot_loss_evolution(self, log_scale=False, linewidth = 0.1):
@@ -170,4 +193,4 @@ class Visualizer(Template):
                 cmap = plot_dict[key]
             key_and_cmap_dict[key] = cmap
         return key_and_cmap_dict
-    
+

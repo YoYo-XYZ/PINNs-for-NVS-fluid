@@ -1,3 +1,4 @@
+import sys
 import torch
 import torch.nn as nn
 import copy
@@ -65,8 +66,8 @@ class NetworkTrainer():
     @staticmethod
     def train_adam(model, learning_rate, epochs, calc_loss, print_every=50, thereshold_loss=None, device= 'cpu'):
         model = copy.deepcopy(model.to(device))
-        if device == 'cuda':
-            torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
+        if device == 'cuda' and sys.platform.startswith('linux'):
+            model = torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
             print('model is compiled for cuda')
 
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -89,8 +90,8 @@ class NetworkTrainer():
     @staticmethod
     def train_lbfgs(model, epochs, calc_loss, print_every=50, thereshold_loss=None, device= 'cpu'):
         model = copy.deepcopy(model.to(device))
-        if device == 'cuda':
-            torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
+        if device == 'cuda' and sys.platform.startswith('linux'):
+            model = torch.compile(model, mode="reduce-overhead", fullgraph=False, dynamic=True, backend="inductor")
             print('model is compiled for cuda')
 
         optimizer = torch.optim.LBFGS(model.parameters(), history_size=20, max_iter=10, line_search_fn="strong_wolfe")
