@@ -77,7 +77,7 @@ class PhysicsAttach():
                 pred_dict[key] = prediction_dict[key]
         return pred_dict
     
-    def calc_loss(self, model, loss_fn=torch.nn.MSELoss()):
+    def calc_loss(self, model, loss_fn = torch.nn.MSELoss()):
         """Calculate loss from PINNs output"""
         if self.physics_type == "IC" or self.physics_type == "BC": 
             pred_dict = self.calc_output(model)
@@ -132,3 +132,7 @@ class PhysicsAttach():
         
     def process_pde(self):
         self.PDE.calc(inputs_dict = self.model_inputs | self.model_outputs)
+
+#-----------------------------------------------------------------------------------------------
+    # def evaluate(self, model):
+    #     return Evaluate(model, self)
